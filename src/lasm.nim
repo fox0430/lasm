@@ -1,13 +1,8 @@
-import std/[json, tables, strutils, sequtils, re, os, options]
+import std/[json, tables, strutils, sequtils, os, options]
 
 import pkg/chronos
 
 type
-  DiagnosticRule = object
-    pattern: Regex
-    severity: int
-    message: string
-
   HoverConfig = object
     enabled: bool
     message: string
@@ -127,7 +122,7 @@ proc createSampleConfig(sm: ScenarioManager) =
     %*{
       "currentScenario": "default",
       "scenarios": {
-        "nim": {
+        "txt": {
           "name": "Nim Language Testing",
           "hover": {
             "enabled": true,
@@ -333,7 +328,7 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
       %*{
         "type": 3,
         "message":
-          "LSP Test Server (Nim) ready! Current scenario: " &
+          "LSP Server ready! Current scenario: " &
           server.scenarioManager.currentScenario,
       },
     )
@@ -359,14 +354,16 @@ proc processInput(server: LSPServer) {.async.} =
   var buffer = ""
 
   while true:
+    # Read input character by character to handle LSP protocol properly
     try:
-      let input = stdin.readLine()
-      buffer.add(input & "\n")
+      let ch = stdin.readChar()
+      buffer.add(ch)
     except EOFError:
       break
     except IOError:
       break
 
+    # Process complete messages
     while true:
       let headerEnd = buffer.find("\r\n\r\n")
       if headerEnd == -1:
@@ -375,8 +372,8 @@ proc processInput(server: LSPServer) {.async.} =
       let header = buffer[0 ..< headerEnd]
       var contentLength = 0
 
-      # Parse Content-Length manually
-      for line in header.split('\n'):
+      # Parse Content-Length header
+      for line in header.split("\r\n"):
         if line.startsWith("Content-Length:"):
           let parts = line.split(':')
           if parts.len >= 2:
@@ -387,10 +384,12 @@ proc processInput(server: LSPServer) {.async.} =
             break
 
       if contentLength == 0:
+        stderr.writeLine("Error: No valid Content-Length found")
         break
 
       let messageStart = headerEnd + 4
 
+      # Check if we have the complete message
       if buffer.len < messageStart + contentLength:
         break
 
@@ -411,7 +410,7 @@ proc main() {.async.} =
     # Default: start with lsp-test-config.json
     let server = newLSPServer()
     stderr.writeLine(
-      "Starting Nim LSP Test Server with scenario: " &
+      "Starting LSP Server with scenario: " &
         server.scenarioManager.currentScenario
     )
     await server.processInput()
@@ -435,7 +434,7 @@ proc main() {.async.} =
     let configPath = paramStr(2)
     let server = newLSPServer(configPath)
     stderr.writeLine(
-      "Starting Nim LSP Test Server with scenario: " &
+      "Starting LSP Server with scenario: " &
         server.scenarioManager.currentScenario
     )
     await server.processInput()
