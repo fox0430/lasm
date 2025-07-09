@@ -10,5 +10,5 @@ bin           = @["lasm"]
 
 # Dependencies
 
-requires "nim >= 2.0.0"
+requires "nim >= 2.0.2"
 requires "chronos >= 4.0.4"
