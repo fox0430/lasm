@@ -1,6 +1,6 @@
 # lasm
 
-A configurable LSP test server for testing LSP clients.
+A configurable LSP server for debugging/testing LSP clients.
 
 ## Quick Start
 
