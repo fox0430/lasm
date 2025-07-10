@@ -1,0 +1,62 @@
+name: Build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build.yaml'
+      - 'lasm.nimble'
+      - 'nimble.lock'
+      - 'src/**'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '.github/workflows/build.yaml'
+      - 'lasm.nimble'
+      - 'nimble.lock'
+      - 'src/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        os:
+          - 'ubuntu-latest'
+          - 'macOS-latest'
+        nim-version:
+          - '2.0.2'
+          - 'stable'
+          - 'devel'
+
+    name: Build on ${{ matrix.nim-version }} (${{ matrix.os }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache nimble
+        id: cache-nimble
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-v2-${{ hashFiles('*.nimble') }}
+          restore-keys: |
+            ${{ runner.os }}-nimble-v2-
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ matrix.nim-version }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        if: matrix.nim-version != 'devel'
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ matrix.nim-version }}
+          use-nightlies: true
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        if: matrix.nim-version == 'devel'
+
+      - run: nimble build -y
