@@ -7,10 +7,9 @@ import scenario
 export tables
 export scenario
 
-type
-  LSPServer = ref object
-    documents*: Table[string, Document]
-    scenarioManager*: ScenarioManager
+type LSPServer = ref object
+  documents*: Table[string, Document]
+  scenarioManager*: ScenarioManager
 
 # LSP Server Implementation
 proc newLSPServer*(configPath: string = ""): LSPServer =
@@ -203,8 +202,7 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
       %*{
         "type": 3,
         "message":
-          "LSP Server ready! Current scenario: " &
-          server.scenarioManager.currentScenario,
+          "LSP Server ready! Current scenario: " & server.scenarioManager.currentScenario,
       },
     )
   of "textDocument/didOpen":
@@ -278,5 +276,3 @@ proc startServer*(server: LSPServer) {.async.} =
         server.sendError(-32700, "Parse error", newJNull())
       except Exception as e:
         stderr.writeLine("Error processing message: " & e.msg)
-
-

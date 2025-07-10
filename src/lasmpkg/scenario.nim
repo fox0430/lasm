@@ -30,10 +30,11 @@ type
     configPath*: string
 
 proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
-  let actualPath = if configPath == "":
-    getCurrentDir() / "lsp-test-config.json"
-  else:
-    configPath
+  let actualPath =
+    if configPath == "":
+      getCurrentDir() / "lsp-test-config.json"
+    else:
+      configPath
 
   if not fileExists(actualPath):
     stderr.writeLine("Error: Configuration file not found: " & actualPath)
@@ -89,10 +90,11 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
 proc newScenarioManager*(configPath: string = ""): ScenarioManager =
   result = ScenarioManager()
   result.currentScenario = "default"
-  result.configPath = if configPath == "":
-    getCurrentDir() / "lsp-test-config.json"
-  else:
-    configPath
+  result.configPath =
+    if configPath == "":
+      getCurrentDir() / "lsp-test-config.json"
+    else:
+      configPath
   if not result.loadConfigFile(result.configPath):
     quit(1)
 
@@ -109,7 +111,9 @@ proc setScenario*(sm: ScenarioManager, scenarioName: string): bool =
     return true
   return false
 
-proc listScenarios*(sm: ScenarioManager): seq[tuple[name: string, description: string]] =
+proc listScenarios*(
+    sm: ScenarioManager
+): seq[tuple[name: string, description: string]] =
   for name, scenario in sm.scenarios.pairs():
     result.add((name: name, description: scenario.name))
 

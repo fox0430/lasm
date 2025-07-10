@@ -24,8 +24,7 @@ proc main() =
     let configPath = paramStr(2)
     let server = newLSPServer(configPath)
     stderr.writeLine(
-      "Starting LSP Server with scenario: " &
-        server.scenarioManager.currentScenario
+      "Starting LSP Server with scenario: " & server.scenarioManager.currentScenario
     )
     waitFor server.startServer
   elif paramStr(1) == "-h" or paramStr(1) == "--help":
