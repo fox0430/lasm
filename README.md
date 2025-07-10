@@ -18,9 +18,10 @@ nimble build
 ## Usage
 
 ```bash
-./lasm                           # Use lsp-test-config.json
-./lasm --config custom.json      # Use custom config file
-./lasm --create-sample-config    # Generate sample config
+Usage:
+  lasm --config <path>         # Start LSP server with config file
+  lasm --create-sample-config  # Create sample configuration
+  lasm --help                  # Show help
 ```
 
 ## Config
