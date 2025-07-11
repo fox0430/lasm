@@ -182,10 +182,3 @@ proc logLSPMessage*(logger: FileLogger, direction: string, message: JsonNode) =
   if logger.shouldLog(LogLevel.Debug):
     let content = $message
     logger.logDebug(fmt"LSP {direction}: {content}")
-
-# Chronicles-related variables removed (no longer needed)
-
-proc logLSPMessage*(direction: string, message: JsonNode) =
-  {.gcsafe.}:
-    if globalLogger != nil:
-      globalLogger.logLSPMessage(direction, message)
