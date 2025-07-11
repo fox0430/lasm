@@ -2,10 +2,9 @@ import std/[sequtils, strutils]
 
 import pkg/chronos
 
-import scenario
+import scenario, logger
 
-export tables
-export scenario
+export tables, scenario
 
 type LSPServer = ref object
   documents*: Table[string, Document]
@@ -13,13 +12,20 @@ type LSPServer = ref object
 
 # LSP Server Implementation
 proc newLSPServer*(configPath: string = ""): LSPServer =
+  logInfo("Creating new LSP server with config: " & configPath)
   result = LSPServer()
   result.documents = initTable[string, Document]()
+  logInfo("Initializing scenario manager")
   result.scenarioManager = newScenarioManager(configPath)
+  logInfo("LSP server created successfully")
 
 proc sendMessage(server: LSPServer, message: JsonNode) =
   let content = $message
   let header = "Content-Length: " & $content.len & "\r\n\r\n"
+  let messageMethod = message.getOrDefault("method").getStr("response")
+  logDebug(
+    "Sending LSP message: " & messageMethod & " (size: " & $content.len & " bytes)"
+  )
   stdout.write(header & content)
   stdout.flushFile()
 
@@ -39,6 +45,8 @@ proc sendNotification(server: LSPServer, methodName: string, params: JsonNode) =
   server.sendMessage(notification)
 
 proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) =
+  let clientPid = params.getOrDefault("processId")
+  logInfo("Handling initialize request from client PID: " & $clientPid)
   let capabilities =
     %*{
       "textDocumentSync":
@@ -193,6 +201,8 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
     else:
       newJNull()
 
+  logDebug("Handling LSP message: " & methodName)
+
   case methodName
   of "initialize":
     server.handleInitialize(id, params)
@@ -216,14 +226,17 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   of "workspace/executeCommand":
     server.handleExecuteCommand(id, params)
   of "shutdown":
+    logInfo("Received shutdown request")
     server.sendResponse(id, newJNull())
   of "exit":
+    logInfo("Received exit request, shutting down server")
     quit(0)
   else:
-    stderr.writeLine("Unknown method: " & methodName)
+    logWarn("Unknown LSP method: " & methodName)
     server.sendError(-32601, "Method not found: " & methodName, id)
 
 proc startServer*(server: LSPServer) {.async.} =
+  logInfo("Starting LSP server main loop")
   var buffer = ""
 
   while true:
@@ -232,8 +245,10 @@ proc startServer*(server: LSPServer) {.async.} =
       let ch = stdin.readChar()
       buffer.add(ch)
     except EOFError:
+      logInfo("EOF received, stopping server")
       break
-    except IOError:
+    except IOError as e:
+      logError("IO error reading from stdin: " & e.msg)
       break
 
     # Process complete messages
@@ -257,7 +272,7 @@ proc startServer*(server: LSPServer) {.async.} =
             break
 
       if contentLength == 0:
-        stderr.writeLine("Error: No valid Content-Length found")
+        logError("No valid Content-Length found in LSP message header")
         break
 
       let messageStart = headerEnd + 4
@@ -272,7 +287,9 @@ proc startServer*(server: LSPServer) {.async.} =
       try:
         let message = parseJson(messageContent)
         await server.handleMessage(message)
-      except JsonParsingError:
+      except JsonParsingError as e:
+        logError("JSON parsing error: " & e.msg)
         server.sendError(-32700, "Parse error", newJNull())
       except Exception as e:
-        stderr.writeLine("Error processing message: " & e.msg)
+        logError("Internal server error: " & e.msg)
+        server.sendError(-32603, "Internal error", newJNull())
