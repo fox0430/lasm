@@ -84,7 +84,7 @@ proc writeLog(logger: FileLogger, level: LogLevel, message: string) =
   try:
     withLock logger.lock:
       if logger.isOpen:
-        let timestamp = now().format("yyyy-MM-dd HH:mm:ss.fff")
+        let timestamp = now().format("yyyy-MM-dd HH:mm:ss")
         let logLine = fmt"[{timestamp}] [{level}] {message}"
         logger.file.writeLine(logLine)
         logger.file.flushFile()
