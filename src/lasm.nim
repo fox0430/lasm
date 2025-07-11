@@ -6,9 +6,8 @@ import lasmpkg/[server, cli, logger]
 
 proc main() =
   if paramCount() == 0:
-    stderr.writeLine("Error: No configuration file specified")
-    writeUsage()
-    quit(1)
+    writeNoConfigError()
+    return
 
   var
     configPath = ""
