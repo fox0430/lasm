@@ -1,5 +1,7 @@
 import std/[tables, os, json]
 
+import logger
+
 export tables, json
 
 type
@@ -36,16 +38,16 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
     else:
       configPath
 
+  logInfo("Loading configuration file: " & actualPath)
+
   if not fileExists(actualPath):
-    stderr.writeLine("Error: Configuration file not found: " & actualPath)
-    if configPath == "":
-      stderr.writeLine(
-        "Please create a configuration file or use --create-sample-config to generate one."
-      )
+    logError("Configuration file not found: " & actualPath)
     return false
 
   try:
+    logInfo("Reading configuration file content")
     let configContent = readFile(actualPath)
+    logDebug("Parsing JSON configuration (size: " & $configContent.len & " bytes)")
     let config = parseJson(configContent)
 
     if config.hasKey("currentScenario"):
@@ -81,10 +83,13 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
 
         sm.scenarios[scenarioName] = scenario
 
-    stderr.writeLine("Loaded config from " & actualPath)
+    logInfo(
+      "Configuration loaded successfully from: " & actualPath & " (" & $sm.scenarios.len &
+        " scenarios)"
+    )
     return true
-  except:
-    stderr.writeLine("Error loading config: " & getCurrentExceptionMsg())
+  except Catchableerror as e:
+    logError("Error loading configuration from: " & actualPath & " - " & e.msg)
     return false
 
 proc newScenarioManager*(configPath: string = ""): ScenarioManager =
@@ -96,6 +101,7 @@ proc newScenarioManager*(configPath: string = ""): ScenarioManager =
     else:
       configPath
   if not result.loadConfigFile(result.configPath):
+    logError("Failed to load configuration file, exiting: " & result.configPath)
     quit(1)
 
 proc getCurrentScenario*(sm: ScenarioManager): Scenario =
@@ -107,9 +113,11 @@ proc getCurrentScenario*(sm: ScenarioManager): Scenario =
 proc setScenario*(sm: ScenarioManager, scenarioName: string): bool =
   if scenarioName in sm.scenarios:
     sm.currentScenario = scenarioName
-    stderr.writeLine("Switched to scenario: " & scenarioName)
+    logInfo("Switched to scenario: " & scenarioName)
     return true
-  return false
+  else:
+    logWarn("Attempted to switch to unknown scenario: " & scenarioName)
+    return false
 
 proc listScenarios*(
     sm: ScenarioManager

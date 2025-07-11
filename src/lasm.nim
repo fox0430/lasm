@@ -2,37 +2,57 @@ import std/os
 
 import pkg/chronos
 
-import lasmpkg/[server, cli]
+import lasmpkg/[server, cli, logger]
 
 proc main() =
-  # Handle command line arguments
   if paramCount() == 0:
     writeNoConfigError()
     return
 
-  if paramStr(1) == "--create-sample-config":
-    let sm = ScenarioManager()
-    sm.createSampleConfig()
-    stderr.writeLine("Sample configuration created. Exiting.")
-    return
+  var
+    configPath = ""
+    enableFileLog = false
 
-  if paramStr(1) == "--config":
-    if paramCount() < 2:
-      writeNoConfigError()
+  # Parse command line arguments
+  var i = 1
+  while i <= paramCount():
+    let param = paramStr(i)
+    case param
+    of "--file-log":
+      enableFileLog = true
+    of "--create-sample-config":
+      let sm = ScenarioManager()
+      sm.createSampleConfig()
       return
+    of "--config":
+      if i + 1 <= paramCount():
+        configPath = paramStr(i + 1)
+        inc i
+      else:
+        return
+    of "-h", "--help":
+      writeUsage()
+      return
+    else:
+      return
+    inc i
 
-    let configPath = paramStr(2)
+  # Initialize file logger if requested
+  if enableFileLog:
+    let fileLogger = newFileLogger(level = LogLevel.Debug)
+    setGlobalLogger(fileLogger)
+
+  # Handle main execution
+  if configPath != "":
+    if enableFileLog:
+      logInfo("Starting LSP server initialization")
     let server = newLSPServer(configPath)
-    stderr.writeLine(
-      "Starting LSP Server with scenario: " & server.scenarioManager.currentScenario
-    )
+    if enableFileLog:
+      logInfo(
+        "LSP server created with scenario: " & server.scenarioManager.currentScenario
+      )
+      logInfo("Starting server main loop")
     waitFor server.startServer
-  elif paramStr(1) == "-h" or paramStr(1) == "--help":
-    writeUsage()
-    return
-  else:
-    writeUnknownOptionError(paramStr(1))
-    return
 
 when isMainModule:
   main()

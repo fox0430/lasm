@@ -5,6 +5,7 @@ proc writeUsage*(isErr: bool = false) =
 Usage:
   lasm --config <path>         # Start LSP server with config file
   lasm --create-sample-config  # Create sample configuration
+  lasm --file-log              # Enable file logging
   lasm --help                  # Show help
 """
 
