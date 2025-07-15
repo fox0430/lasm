@@ -75,33 +75,66 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           if h.enabled:
             # Handle single content field
             if hoverNode.contains("content"):
-              var hoverContent = HoverContent(
-                kind: hoverNode["content"]["kind"].getStr("plaintext"),
-                message: hoverNode["content"]["message"].getStr(""),
-              )
+              let
+                kind =
+                  if hoverNode["content"].contains("kind"):
+                    hoverNode["content"]["kind"].getStr
+                  else:
+                    "plaintext"
+                message =
+                  if hoverNode["content"].contains("message"):
+                    hoverNode["content"]["message"].getStr
+                  else:
+                    ""
+
+              var hoverContent = HoverContent(kind: kind, message: message)
               if hoverNode["content"].contains("position"):
-                hoverContent.position = some(
-                  Position(
-                    line: hoverNode["content"]["position"]["line"].getInt(0),
-                    character: hoverNode["content"]["position"]["character"].getInt(0),
-                  )
-                )
+                let
+                  line =
+                    if hoverNode["content"]["position"].contains("line"):
+                      hoverNode["content"]["position"]["line"].getInt
+                    else:
+                      0
+                  character =
+                    if hoverNode["content"]["position"].contains("character"):
+                      hoverNode["content"]["position"]["character"].getInt(0)
+                    else:
+                      0
+
+                hoverContent.position = some(Position(line: line, character: character))
               h.content = some(hoverContent)
             # Handle contents array field
             elif hoverNode.contains("contents"):
               h.contents = @[]
               for hoverContentNode in hoverNode["contents"]:
-                var hoverContent = HoverContent(
-                  kind: hoverContentNode["kind"].getStr("plaintext"),
-                  message: hoverContentNode["message"].getStr(""),
-                )
+                let
+                  kind =
+                    if hoverContentNode.contains("kind"):
+                      hoverContentNode["kind"].getStr
+                    else:
+                      "plaintext"
+                  message =
+                    if hoverContentNode.contains("message"):
+                      hoverContentNode["message"].getStr
+                    else:
+                      ""
+
+                var hoverContent = HoverContent(kind: kind, message: message)
                 if hoverContentNode.contains("position"):
-                  hoverContent.position = some(
-                    Position(
-                      line: hoverContentNode["position"]["line"].getInt(0),
-                      character: hoverContentNode["position"]["character"].getInt(0),
-                    )
-                  )
+                  let
+                    line =
+                      if hoverNode["content"]["position"].contains("line"):
+                        hoverNode["content"]["position"]["line"].getInt
+                      else:
+                        0
+                    character =
+                      if hoverNode["content"]["position"].contains("character"):
+                        hoverNode["content"]["position"]["character"].getInt(0)
+                      else:
+                        0
+
+                  hoverContent.position =
+                    some(Position(line: line, character: character))
                 h.contents.add(hoverContent)
 
           scenario.hover = h
