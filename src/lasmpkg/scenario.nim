@@ -130,15 +130,15 @@ proc createSampleConfig*(sm: ScenarioManager) =
     %*{
       "currentScenario": "default",
       "scenarios": {
-        "txt": {
-          "name": "Nim Language Testing",
+        "default": {
+          "name": "Default Testing",
           "hover": {
             "enabled": true,
-            "message": "**Nim Symbol**\n\nThis is a Nim language symbol.",
+            "message": "**Default Symbol**\n\nThis is a default test symbol.",
           },
           "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
         }
-      },
+      }
     }
 
   let configPath = getCurrentDir() / "lsp-test-config-sample.json"
