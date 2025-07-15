@@ -1,4 +1,4 @@
-import std/[sequtils, strutils, json, options]
+import std/[sequtils, strutils, strformat, json, options]
 
 import pkg/chronos
 
@@ -21,13 +21,14 @@ proc newLSPServer*(configPath: string = ""): LSPServer =
   logInfo("LSP server created successfully")
 
 proc sendMessage(server: LSPServer, message: JsonNode) =
-  let content = $message
-  let header = "Content-Length: " & $content.len & "\r\n\r\n"
-  let messageMethod = message.getOrDefault("method").getStr("response")
-  logDebug(
-    "Sending LSP message: " & messageMethod & " (size: " & $content.len & " bytes)"
-  )
-  stdout.write(header & content)
+  let
+    content = $message
+    header = "Content-Length: " & $content.len & "\r\n\r\n"
+    buf = header & content
+
+  logDebug(fmt"Send message: ${buf}")
+
+  stdout.write(buf)
   stdout.flushFile()
 
 proc sendResponse(server: LSPServer, id: JsonNode, result: JsonNode) =
@@ -307,6 +308,8 @@ proc startServer*(server: LSPServer) {.async.} =
 
       let messageContent = buffer[messageStart ..< messageStart + contentLength]
       buffer = buffer[messageStart + contentLength ..^ 1]
+
+      logDebug(fmt"Received message: ${buffer}")
 
       try:
         let message = parseJson(messageContent)
