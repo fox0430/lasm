@@ -1,8 +1,9 @@
-import std/[sequtils, strutils]
+import std/[sequtils, strutils, json, options]
 
 import pkg/chronos
 
 import scenario, logger
+import protocol/types
 
 export tables, scenario
 
@@ -175,18 +176,41 @@ proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
     return
 
   let position = params["position"]
-  let r =
-    %*{
-      "contents": {"kind": "markdown", "value": scenario.hover.message},
-      "range": {
-        "start": position,
-        "end": {
-          "line": position["line"].getInt(),
-          "character": position["character"].getInt() + 5,
-        },
-      },
-    }
-  server.sendResponse(id, r)
+
+  # Create a proper Hover object
+  let hover = Hover()
+  if scenario.hover.content.isSome:
+    # Use single content field
+    hover.contents = some(%*{
+      "kind": scenario.hover.content.get.kind,
+      "value": scenario.hover.content.get.message,
+    })
+  elif scenario.hover.contents.len > 0:
+    # Use contents array - support multiple contents for rich hover info
+    var contentsArray = newJArray()
+    for hoverContent in scenario.hover.contents:
+      contentsArray.add(%*{
+        "kind": hoverContent.kind,
+        "value": hoverContent.message,
+      })
+    hover.contents = some(%contentsArray)
+  else:
+    # Default fallback
+    hover.contents = some(%*{"kind": "plaintext", "value": "No hover information available"})
+  hover.range = some(
+    Range(
+      start: Position(
+        line: uinteger(position["line"].getInt),
+        character: uinteger(position["character"].getInt),
+      ),
+      `end`: Position(
+        line: uinteger(position["line"].getInt),
+        character: uinteger(position["character"].getInt),
+      ),
+    )
+  )
+
+  server.sendResponse(id, %hover)
 
 proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
