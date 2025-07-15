@@ -181,22 +181,22 @@ proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let hover = Hover()
   if scenario.hover.content.isSome:
     # Use single content field
-    hover.contents = some(%*{
-      "kind": scenario.hover.content.get.kind,
-      "value": scenario.hover.content.get.message,
-    })
+    hover.contents = some(
+      %*{
+        "kind": scenario.hover.content.get.kind,
+        "value": scenario.hover.content.get.message,
+      }
+    )
   elif scenario.hover.contents.len > 0:
     # Use contents array - support multiple contents for rich hover info
     var contentsArray = newJArray()
     for hoverContent in scenario.hover.contents:
-      contentsArray.add(%*{
-        "kind": hoverContent.kind,
-        "value": hoverContent.message,
-      })
+      contentsArray.add(%*{"kind": hoverContent.kind, "value": hoverContent.message})
     hover.contents = some(%contentsArray)
   else:
     # Default fallback
-    hover.contents = some(%*{"kind": "plaintext", "value": "No hover information available"})
+    hover.contents =
+      some(%*{"kind": "plaintext", "value": "No hover information available"})
   hover.range = some(
     Range(
       start: Position(

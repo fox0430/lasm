@@ -77,11 +77,15 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             if hoverNode.contains("content"):
               var hoverContent = HoverContent(
                 kind: hoverNode["content"]["kind"].getStr("plaintext"),
-                message: hoverNode["content"]["message"].getStr(""))
+                message: hoverNode["content"]["message"].getStr(""),
+              )
               if hoverNode["content"].contains("position"):
-                hoverContent.position = some(Position(
-                  line: hoverNode["content"]["position"]["line"].getInt(0),
-                  character: hoverNode["content"]["position"]["character"].getInt(0)))
+                hoverContent.position = some(
+                  Position(
+                    line: hoverNode["content"]["position"]["line"].getInt(0),
+                    character: hoverNode["content"]["position"]["character"].getInt(0),
+                  )
+                )
               h.content = some(hoverContent)
             # Handle contents array field
             elif hoverNode.contains("contents"):
@@ -89,11 +93,15 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
               for hoverContentNode in hoverNode["contents"]:
                 var hoverContent = HoverContent(
                   kind: hoverContentNode["kind"].getStr("plaintext"),
-                  message: hoverContentNode["message"].getStr(""))
+                  message: hoverContentNode["message"].getStr(""),
+                )
                 if hoverContentNode.contains("position"):
-                  hoverContent.position = some(Position(
-                    line: hoverContentNode["position"]["line"].getInt(0),
-                    character: hoverContentNode["position"]["character"].getInt(0)))
+                  hoverContent.position = some(
+                    Position(
+                      line: hoverContentNode["position"]["line"].getInt(0),
+                      character: hoverContentNode["position"]["character"].getInt(0),
+                    )
+                  )
                 h.contents.add(hoverContent)
 
           scenario.hover = h
@@ -169,16 +177,13 @@ proc createSampleConfig*(sm: ScenarioManager) =
               {
                 "kind": "markdown",
                 "message": "**Default Symbol**\n\nThis is a default test symbol.",
-                "position": {
-                  "line": 0,
-                  "character": 0
-                }
-              },
-            ]
+                "position": {"line": 0, "character": 0},
+              }
+            ],
           },
           "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
         }
-      }
+      },
     }
 
   let configPath = getCurrentDir() / "lsp-test-config-sample.json"
