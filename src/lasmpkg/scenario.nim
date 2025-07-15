@@ -138,7 +138,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           },
           "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
         }
-      }
+      },
     }
 
   let configPath = getCurrentDir() / "lsp-test-config-sample.json"
