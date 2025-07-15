@@ -1,13 +1,20 @@
-import std/[tables, os, json]
+import std/[tables, os, json, options]
 
 import logger
+import protocol/types
 
 export tables, json
 
 type
+  HoverContent = object
+    kind*: string
+    message*: string
+    position: Option[Position]
+
   HoverConfig* = object
     enabled*: bool
-    message*: string
+    content*: Option[HoverContent]
+    contents*: seq[HoverContent]
 
   DelayConfig* = object
     hover*: int
@@ -59,21 +66,86 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
         var scenario = Scenario()
         scenario.name = scenarioData{"name"}.getStr(scenarioName)
 
-        # Load hover configuration
         if scenarioData.hasKey("hover"):
+          # Load hover configuration
           let hoverNode = scenarioData["hover"]
-          scenario.hover = HoverConfig(
-            enabled: hoverNode{"enabled"}.getBool(true),
-            message: hoverNode{"message"}.getStr("Default hover message"),
-          )
 
-        # Load delay configuration
+          var h = HoverConfig(enabled: hoverNode["enabled"].getBool(false))
+
+          if h.enabled:
+            # Handle single content field
+            if hoverNode.contains("content"):
+              let
+                kind =
+                  if hoverNode["content"].contains("kind"):
+                    hoverNode["content"]["kind"].getStr
+                  else:
+                    "plaintext"
+                message =
+                  if hoverNode["content"].contains("message"):
+                    hoverNode["content"]["message"].getStr
+                  else:
+                    ""
+
+              var hoverContent = HoverContent(kind: kind, message: message)
+              if hoverNode["content"].contains("position"):
+                let
+                  line =
+                    if hoverNode["content"]["position"].contains("line"):
+                      hoverNode["content"]["position"]["line"].getInt
+                    else:
+                      0
+                  character =
+                    if hoverNode["content"]["position"].contains("character"):
+                      hoverNode["content"]["position"]["character"].getInt(0)
+                    else:
+                      0
+
+                hoverContent.position = some(Position(line: line, character: character))
+              h.content = some(hoverContent)
+            # Handle contents array field
+            elif hoverNode.contains("contents"):
+              h.contents = @[]
+              for hoverContentNode in hoverNode["contents"]:
+                let
+                  kind =
+                    if hoverContentNode.contains("kind"):
+                      hoverContentNode["kind"].getStr
+                    else:
+                      "plaintext"
+                  message =
+                    if hoverContentNode.contains("message"):
+                      hoverContentNode["message"].getStr
+                    else:
+                      ""
+
+                var hoverContent = HoverContent(kind: kind, message: message)
+                if hoverContentNode.contains("position"):
+                  let
+                    line =
+                      if hoverNode["content"]["position"].contains("line"):
+                        hoverNode["content"]["position"]["line"].getInt
+                      else:
+                        0
+                    character =
+                      if hoverNode["content"]["position"].contains("character"):
+                        hoverNode["content"]["position"]["character"].getInt(0)
+                      else:
+                        0
+
+                  hoverContent.position =
+                    some(Position(line: line, character: character))
+                h.contents.add(hoverContent)
+
+          scenario.hover = h
+
         if scenarioData.hasKey("delays"):
+          # Load delay configuration
           let delaysNode = scenarioData["delays"]
-          scenario.delays = DelayConfig(hover: delaysNode{"hover"}.getInt(0))
+          scenario.delays = DelayConfig(hover: delaysNode["hover"].getInt(0))
 
-        # Load error configuration
         if scenarioData.hasKey("errors"):
+          # Load error configuration
           let errorsNode = scenarioData["errors"]
           for errorType, errorData in errorsNode.pairs():
             scenario.errors[errorType] = ErrorConfig(
@@ -134,7 +206,13 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "name": "Default Testing",
           "hover": {
             "enabled": true,
-            "message": "**Default Symbol**\n\nThis is a default test symbol.",
+            "contents": [
+              {
+                "kind": "markdown",
+                "message": "**Default Symbol**\n\nThis is a default test symbol.",
+                "position": {"line": 0, "character": 0},
+              }
+            ],
           },
           "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
         }
