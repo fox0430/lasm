@@ -1,4 +1,4 @@
-import std/[tables, os, json, options]
+import std/[tables, os, json, options, strformat]
 
 import logger
 import protocol/types
@@ -56,6 +56,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
     let configContent = readFile(actualPath)
     logDebug("Parsing JSON configuration (size: " & $configContent.len & " bytes)")
     let config = parseJson(configContent)
+
+    logDebug(fmt"Loaded JSON configuration: ${config}")
 
     if config.hasKey("currentScenario"):
       sm.currentScenario = config["currentScenario"].getStr()
