@@ -36,8 +36,8 @@ See `lsp-test-config-sample.json` for examples.
 
 ## Supported LSP methods
 
-|--|--|
 | Name | Note |
+|--|--|
 | initialize | |
 | initialized | |
 | textDocument/didOpen | |
