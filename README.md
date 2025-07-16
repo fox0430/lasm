@@ -34,3 +34,15 @@ Configure scenarios in JSON to control LSP behavior:
 - Feature toggles
 
 See `lsp-test-config-sample.json` for examples.
+
+## Supported LSP methods
+
+| Name | Note |
+|--|--|
+| initialize | |
+| initialized | |
+| textDocument/didOpen | |
+| textDocument/didChange | |
+| textDocument/didClose | |
+| textDocument/hover | |
+| textDocument/shutdown | |
