@@ -22,6 +22,7 @@ Usage:
   lasm --config <path>         # Start LSP server with config file
   lasm --create-sample-config  # Create sample configuration
   lasm --file-log              # Enable file logging
+  lasm --file-log-path <path>  # Set log file path
   lasm --help                  # Show help
 ```
 

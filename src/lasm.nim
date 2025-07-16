@@ -12,6 +12,7 @@ proc main() =
   var
     configPath = ""
     enableFileLog = false
+    logPath = ""
 
   # Parse command line arguments
   var i = 1
@@ -20,6 +21,9 @@ proc main() =
     case param
     of "--file-log":
       enableFileLog = true
+    of "--file-log-path":
+      logPath = paramStr(i + 1)
+      i.inc
     of "--create-sample-config":
       let sm = ScenarioManager()
       sm.createSampleConfig()
@@ -27,7 +31,7 @@ proc main() =
     of "--config":
       if i + 1 <= paramCount():
         configPath = paramStr(i + 1)
-        inc i
+        i.inc
       else:
         return
     of "-h", "--help":
@@ -35,11 +39,13 @@ proc main() =
       return
     else:
       return
-    inc i
+    i.inc
 
-  # Initialize file logger if requested
   if enableFileLog:
-    let fileLogger = newFileLogger(level = LogLevel.Debug)
+    # Initialize file logger if requested
+    let
+      path = if logPath.len > 0: logPath else: "lasm.log"
+      fileLogger = newFileLogger(path, level = LogLevel.Debug)
     setGlobalLogger(fileLogger)
 
   # Handle main execution
