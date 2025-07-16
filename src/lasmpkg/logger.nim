@@ -108,7 +108,7 @@ proc newFileLogger*(config: LoggerConfig): FileLogger =
       discard
 
 proc newFileLogger*(
-    filePath: string = "lsp-server.log",
+    filePath: string = "lasm.log",
     level: LogLevel = LogLevel.Info,
     enabled: bool = true,
     maxFileSize: int = 10485760,
