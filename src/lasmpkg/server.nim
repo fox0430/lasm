@@ -71,7 +71,9 @@ proc sendError(
     %*{"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
   await server.sendMessage(response)
 
-proc sendNotification(server: LSPServer, methodName: string, params: JsonNode) {.async.} =
+proc sendNotification(
+    server: LSPServer, methodName: string, params: JsonNode
+) {.async.} =
   let notification = %*{"jsonrpc": "2.0", "method": methodName, "params": params}
   await server.sendMessage(notification)
 
