@@ -12,7 +12,7 @@ nimble build
 ./lasm --create-sample-config
 
 # Start server
-./lasm
+./lasm --config ./lsp-test-config-sample.json
 ```
 
 ## Usage
@@ -21,13 +21,14 @@ nimble build
 Usage:
   lasm --config <path>         # Start LSP server with config file
   lasm --create-sample-config  # Create sample configuration
+  lasm --file-log              # Enable file logging
   lasm --help                  # Show help
 ```
 
 ## Config
 
 Configure scenarios in JSON to control LSP behavior:
-- Hover responses and delays
+- Responses and delays
 - Error injection
 - Feature toggles
 
