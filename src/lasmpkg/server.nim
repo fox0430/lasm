@@ -1,9 +1,9 @@
-import std/[sequtils, strutils, strformat, json, options]
+import std/[strutils, strformat, json]
 
 import pkg/chronos
 import pkg/chronos/transports/stream
 
-import scenario, logger
+import scenario, logger, lsp_handler
 import protocol/types
 
 export tables, scenario
@@ -15,16 +15,13 @@ type
 
   LSPServer = ref object
     transports: Transports
-    documents*: Table[string, Document]
-    scenarioManager*: ScenarioManager
+    lspHandler*: LSPHandler
 
-# LSP Server Implementation
 proc newLSPServer*(configPath: string = ""): LSPServer =
+  ## LSP Server Implementation
   logInfo("Creating new LSP server with config: " & configPath)
 
   result = LSPServer()
-
-  result.documents = initTable[string, Document]()
 
   const
     STDIN_FD = 0
@@ -34,7 +31,8 @@ proc newLSPServer*(configPath: string = ""): LSPServer =
   result.transports.output = fromPipe(AsyncFD(STDOUT_FD))
 
   logInfo("Initializing scenario manager")
-  result.scenarioManager = newScenarioManager(configPath)
+  let scenarioManager = newScenarioManager(configPath)
+  result.lspHandler = newLSPHandler(scenarioManager)
 
   logInfo("LSP server created successfully")
 
@@ -78,192 +76,48 @@ proc sendNotification(
   await server.sendMessage(notification)
 
 proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  let clientPid = params.getOrDefault("processId")
-  logInfo("Handling initialize request from client PID: " & $clientPid)
-  let capabilities =
-    %*{
-      "textDocumentSync":
-        {"openClose": true, "change": 2, "save": {"includeText": true}},
-      "completionProvider": {"triggerCharacters": [".", ":", "(", " "]},
-      "hoverProvider": true,
-      "executeCommandProvider": {
-        "commands": [
-          "lsptest.switchScenario", "lsptest.listScenarios", "lsptest.reloadConfig",
-          "lsptest.createSampleConfig",
-        ]
-      },
-      "diagnosticProvider":
-        {"interFileDependencies": false, "workspaceDiagnostics": false},
-    }
-
-  let r =
-    %*{
-      "capabilities": capabilities,
-      "serverInfo": {"name": "LSP Test Server", "version": "0.1.0"},
-    }
-
-  await server.sendResponse(id, r)
+  let response = await server.lspHandler.handleInitialize(id, params)
+  await server.sendResponse(id, response)
 
 proc handleExecuteCommand(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  let command = params["command"].getStr()
-  let args =
-    if params.hasKey("arguments"):
-      params["arguments"]
-    else:
-      newJArray()
-
-  case command
-  of "lsptest.switchScenario":
-    if args.len > 0:
-      let scenarioName = args[0].getStr()
-      if server.scenarioManager.setScenario(scenarioName):
-        await server.sendResponse(id, %*{"success": true})
-        await server.sendNotification(
-          "window/showMessage",
-          %*{"type": 3, "message": "Switched to scenario: " & scenarioName},
-        )
-      else:
-        await server.sendError(-32602, "Unknown scenario: " & scenarioName, id)
-    else:
-      await server.sendError(-32602, "Missing scenario name argument", id)
-  of "lsptest.listScenarios":
-    let scenarios = server.scenarioManager.listScenarios()
-    let scenarioList = scenarios.map(
-      proc(s: auto): JsonNode =
-        %*{"name": s.name, "description": s.description}
-    )
-    await server.sendResponse(id, %scenarioList)
-    let names = scenarios
-      .map(
-        proc(s: auto): string =
-          s.name
-      )
-      .join(", ")
-    await server.sendNotification(
-      "window/showMessage", %*{"type": 3, "message": "Available scenarios: " & names}
-    )
-  of "lsptest.reloadConfig":
-    if server.scenarioManager.loadConfigFile(server.scenarioManager.configPath):
-      await server.sendResponse(id, %*{"success": true})
+  try:
+    let (response, notifications) =
+      await server.lspHandler.handleExecuteCommand(id, params)
+    await server.sendResponse(id, response)
+    for notification in notifications:
       await server.sendNotification(
-        "window/showMessage", %*{"type": 3, "message": "Configuration reloaded"}
+        notification["method"].getStr(), notification["params"]
       )
-    else:
-      await server.sendError(-32603, "Failed to reload configuration", id)
-  of "lsptest.createSampleConfig":
-    server.scenarioManager.createSampleConfig()
-    await server.sendResponse(id, %*{"success": true})
-    await server.sendNotification(
-      "window/showMessage",
-      %*{"type": 3, "message": "Sample configuration file created"},
-    )
-  else:
-    await server.sendError(-32601, "Unknown command: " & command, id)
+  except LSPError as e:
+    await server.sendError(-32602, e.msg, id)
 
 proc handleDidOpen(server: LSPServer, params: JsonNode) {.async.} =
-  let
-    textDocument = params["textDocument"]
-    uri = textDocument["uri"].getStr
-    content = textDocument["text"].getStr
-    version = textDocument["version"].getInt
-
-  server.documents[uri] = Document(content: content, version: version)
-
-  # Return notify for debug.
-  await server.sendNotification(
-    "window/logMessage",
-    %*{"type": 5, "message": fmt"Received textDocument/didOpen notify: {params}"},
-  )
+  let notifications = await server.lspHandler.handleDidOpen(params)
+  for notification in notifications:
+    await server.sendNotification(
+      notification["method"].getStr(), notification["params"]
+    )
 
 proc handleDidChange(server: LSPServer, params: JsonNode) {.async.} =
-  let
-    textDocument = params["textDocument"]
-    uri = textDocument["uri"].getStr()
-    version = textDocument["version"].getInt()
-    contentChanges = params["contentChanges"]
-
-  if uri in server.documents:
-    for change in contentChanges.items():
-      if change.hasKey("range"):
-        # Range-based change (simple implementation)
-        server.documents[uri].content = change["text"].getStr()
-      else:
-        # Full content change
-        server.documents[uri].content = change["text"].getStr()
-
-    server.documents[uri].version = version
-
-  # Return notify for debug.
-  await server.sendNotification(
-    "window/logMessage",
-    %*{"type": 5, "message": fmt"Received textDocument/didChange notify: {params}"},
-  )
+  let notifications = await server.lspHandler.handleDidChange(params)
+  for notification in notifications:
+    await server.sendNotification(
+      notification["method"].getStr(), notification["params"]
+    )
 
 proc handleDidClose(server: LSPServer, params: JsonNode) {.async.} =
-  let
-    textDocument = params["textDocument"]
-    uri = textDocument["uri"].getStr()
-  server.documents.del(uri)
-
-  # Return notify for debug.
-  await server.sendNotification(
-    "window/logMessage",
-    %*{"type": 5, "message": fmt"Received textDocument/didClose notify: {params}"},
-  )
+  let notifications = await server.lspHandler.handleDidClose(params)
+  for notification in notifications:
+    await server.sendNotification(
+      notification["method"].getStr(), notification["params"]
+    )
 
 proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  let scenario = server.scenarioManager.getCurrentScenario()
-
-  # Delay processing
-  if scenario.delays.hover > 0:
-    await sleepAsync(scenario.delays.hover.milliseconds)
-
-  if not scenario.hover.enabled:
-    await server.sendResponse(id, newJNull())
-    return
-
-  # Handle error scenarios
-  if "hover" in scenario.errors:
-    let error = scenario.errors["hover"]
-    await server.sendError(error.code, error.message, id)
-    return
-
-  let position = params["position"]
-
-  # Create a proper Hover object
-  let hover = Hover()
-  if scenario.hover.content.isSome:
-    # Use single content field
-    hover.contents = some(
-      %*{
-        "kind": scenario.hover.content.get.kind,
-        "value": scenario.hover.content.get.message,
-      }
-    )
-  elif scenario.hover.contents.len > 0:
-    # Use contents array - support multiple contents for rich hover info
-    var contentsArray = newJArray()
-    for hoverContent in scenario.hover.contents:
-      contentsArray.add(%*{"kind": hoverContent.kind, "value": hoverContent.message})
-    hover.contents = some(%contentsArray)
-  else:
-    # Default fallback
-    hover.contents =
-      some(%*{"kind": "plaintext", "value": "No hover information available"})
-  hover.range = some(
-    Range(
-      start: Position(
-        line: uinteger(position["line"].getInt),
-        character: uinteger(position["character"].getInt),
-      ),
-      `end`: Position(
-        line: uinteger(position["line"].getInt),
-        character: uinteger(position["character"].getInt),
-      ),
-    )
-  )
-
-  await server.sendResponse(id, %hover)
+  try:
+    let response = await server.lspHandler.handleHover(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
 
 proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
@@ -284,14 +138,11 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   of "initialize":
     await server.handleInitialize(id, params)
   of "initialized":
-    await server.sendNotification(
-      "window/showMessage",
-      %*{
-        "type": 3,
-        "message":
-          "LSP Server ready! Current scenario: " & server.scenarioManager.currentScenario,
-      },
-    )
+    let notifications = server.lspHandler.handleInitialized()
+    for notification in notifications:
+      await server.sendNotification(
+        notification["method"].getStr(), notification["params"]
+      )
   of "textDocument/didOpen":
     await server.handleDidOpen(params)
   of "textDocument/didChange":

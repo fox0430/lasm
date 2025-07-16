@@ -2,7 +2,7 @@ import std/os
 
 import pkg/chronos
 
-import lasmpkg/[server, cli, logger]
+import lasmpkg/[server, cli, logger, lsp_handler]
 
 proc main() =
   if paramCount() == 0:
@@ -49,7 +49,8 @@ proc main() =
     let server = newLSPServer(configPath)
     if enableFileLog:
       logInfo(
-        "LSP server created with scenario: " & server.scenarioManager.currentScenario
+        "LSP server created with scenario: " &
+          server.lspHandler.scenarioManager.currentScenario
       )
       logInfo("Starting server main loop")
     waitFor server.startServer
