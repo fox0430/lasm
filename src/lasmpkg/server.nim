@@ -1,26 +1,53 @@
 import std/[sequtils, strutils, strformat, json, options]
 
 import pkg/chronos
+import pkg/chronos/transports/stream
 
 import scenario, logger
 import protocol/types
 
 export tables, scenario
 
-type LSPServer = ref object
-  documents*: Table[string, Document]
-  scenarioManager*: ScenarioManager
+type
+  Transports = ref object
+    input: StreamTransport
+    output: StreamTransport
+
+  LSPServer = ref object
+    transports: Transports
+    documents*: Table[string, Document]
+    scenarioManager*: ScenarioManager
 
 # LSP Server Implementation
 proc newLSPServer*(configPath: string = ""): LSPServer =
   logInfo("Creating new LSP server with config: " & configPath)
+
   result = LSPServer()
+
   result.documents = initTable[string, Document]()
+
+  const
+    STDIN_FD = 0
+    STDOUT_FD = 1
+  result.transports = Transports()
+  result.transports.input = fromPipe(AsyncFD(STDIN_FD))
+  result.transports.output = fromPipe(AsyncFD(STDOUT_FD))
+
   logInfo("Initializing scenario manager")
   result.scenarioManager = newScenarioManager(configPath)
+
   logInfo("LSP server created successfully")
 
-proc sendMessage(server: LSPServer, message: JsonNode) =
+proc read(server: LSPServer): Future[char] {.async.} =
+  let r = await server.transports.input.read(1)
+  return char(r[0])
+
+proc write(server: LSPServer, buf: string) {.async.} =
+  let r = await server.transports.output.write(buf)
+  if r == -1:
+    raise newException(IOError, "Failed to write messages")
+
+proc sendMessage(server: LSPServer, message: JsonNode) {.async.} =
   let
     content = $message
     header = "Content-Length: " & $content.len & "\r\n\r\n"
@@ -28,25 +55,29 @@ proc sendMessage(server: LSPServer, message: JsonNode) =
 
   logDebug(fmt"Send message: {buf}")
 
-  stdout.write(buf)
-  stdout.flushFile()
+  try:
+    await server.write(buf)
+  except IOError as e:
+    logError(fmt"sendMessage: {e.msg}")
 
-proc sendResponse(server: LSPServer, id: JsonNode, result: JsonNode) =
-  let response = %*{"jsonrpc": "2.0", "id": id, "result": result}
-  server.sendMessage(response)
+proc sendResponse(server: LSPServer, id: JsonNode, r: JsonNode) {.async.} =
+  let response = %*{"jsonrpc": "2.0", "id": id, "result": r}
+  await server.sendMessage(response)
 
 proc sendError(
     server: LSPServer, code: int, message: string, id: JsonNode = newJNull()
-) =
+) {.async.} =
   let response =
     %*{"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
-  server.sendMessage(response)
+  await server.sendMessage(response)
 
-proc sendNotification(server: LSPServer, methodName: string, params: JsonNode) =
+proc sendNotification(
+    server: LSPServer, methodName: string, params: JsonNode
+) {.async.} =
   let notification = %*{"jsonrpc": "2.0", "method": methodName, "params": params}
-  server.sendMessage(notification)
+  await server.sendMessage(notification)
 
-proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) =
+proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let clientPid = params.getOrDefault("processId")
   logInfo("Handling initialize request from client PID: " & $clientPid)
   let capabilities =
@@ -71,9 +102,9 @@ proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) =
       "serverInfo": {"name": "LSP Test Server", "version": "0.1.0"},
     }
 
-  server.sendResponse(id, r)
+  await server.sendResponse(id, r)
 
-proc handleExecuteCommand(server: LSPServer, id: JsonNode, params: JsonNode) =
+proc handleExecuteCommand(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let command = params["command"].getStr()
   let args =
     if params.hasKey("arguments"):
@@ -86,48 +117,48 @@ proc handleExecuteCommand(server: LSPServer, id: JsonNode, params: JsonNode) =
     if args.len > 0:
       let scenarioName = args[0].getStr()
       if server.scenarioManager.setScenario(scenarioName):
-        server.sendResponse(id, %*{"success": true})
-        server.sendNotification(
+        await server.sendResponse(id, %*{"success": true})
+        await server.sendNotification(
           "window/showMessage",
           %*{"type": 3, "message": "Switched to scenario: " & scenarioName},
         )
       else:
-        server.sendError(-32602, "Unknown scenario: " & scenarioName, id)
+        await server.sendError(-32602, "Unknown scenario: " & scenarioName, id)
     else:
-      server.sendError(-32602, "Missing scenario name argument", id)
+      await server.sendError(-32602, "Missing scenario name argument", id)
   of "lsptest.listScenarios":
     let scenarios = server.scenarioManager.listScenarios()
     let scenarioList = scenarios.map(
       proc(s: auto): JsonNode =
         %*{"name": s.name, "description": s.description}
     )
-    server.sendResponse(id, %scenarioList)
+    await server.sendResponse(id, %scenarioList)
     let names = scenarios
       .map(
         proc(s: auto): string =
           s.name
       )
       .join(", ")
-    server.sendNotification(
+    await server.sendNotification(
       "window/showMessage", %*{"type": 3, "message": "Available scenarios: " & names}
     )
   of "lsptest.reloadConfig":
     if server.scenarioManager.loadConfigFile(server.scenarioManager.configPath):
-      server.sendResponse(id, %*{"success": true})
-      server.sendNotification(
+      await server.sendResponse(id, %*{"success": true})
+      await server.sendNotification(
         "window/showMessage", %*{"type": 3, "message": "Configuration reloaded"}
       )
     else:
-      server.sendError(-32603, "Failed to reload configuration", id)
+      await server.sendError(-32603, "Failed to reload configuration", id)
   of "lsptest.createSampleConfig":
     server.scenarioManager.createSampleConfig()
-    server.sendResponse(id, %*{"success": true})
-    server.sendNotification(
+    await server.sendResponse(id, %*{"success": true})
+    await server.sendNotification(
       "window/showMessage",
       %*{"type": 3, "message": "Sample configuration file created"},
     )
   else:
-    server.sendError(-32601, "Unknown command: " & command, id)
+    await server.sendError(-32601, "Unknown command: " & command, id)
 
 proc handleDidOpen(server: LSPServer, params: JsonNode) {.async.} =
   let
@@ -139,7 +170,7 @@ proc handleDidOpen(server: LSPServer, params: JsonNode) {.async.} =
   server.documents[uri] = Document(content: content, version: version)
 
   # Return notify for debug.
-  server.sendNotification(
+  await server.sendNotification(
     "window/logMessage",
     %*{"type": 5, "message": fmt"Received textDocument/didOpen notify: {params}"},
   )
@@ -163,7 +194,7 @@ proc handleDidChange(server: LSPServer, params: JsonNode) {.async.} =
     server.documents[uri].version = version
 
   # Return notify for debug.
-  server.sendNotification(
+  await server.sendNotification(
     "window/logMessage",
     %*{"type": 5, "message": fmt"Received textDocument/didChange notify: {params}"},
   )
@@ -175,7 +206,7 @@ proc handleDidClose(server: LSPServer, params: JsonNode) {.async.} =
   server.documents.del(uri)
 
   # Return notify for debug.
-  server.sendNotification(
+  await server.sendNotification(
     "window/logMessage",
     %*{"type": 5, "message": fmt"Received textDocument/didClose notify: {params}"},
   )
@@ -188,13 +219,13 @@ proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
     await sleepAsync(scenario.delays.hover.milliseconds)
 
   if not scenario.hover.enabled:
-    server.sendResponse(id, newJNull())
+    await server.sendResponse(id, newJNull())
     return
 
   # Handle error scenarios
   if "hover" in scenario.errors:
     let error = scenario.errors["hover"]
-    server.sendError(error.code, error.message, id)
+    await server.sendError(error.code, error.message, id)
     return
 
   let position = params["position"]
@@ -232,7 +263,7 @@ proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
     )
   )
 
-  server.sendResponse(id, %hover)
+  await server.sendResponse(id, %hover)
 
 proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
@@ -251,9 +282,9 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
 
   case methodName
   of "initialize":
-    server.handleInitialize(id, params)
+    await server.handleInitialize(id, params)
   of "initialized":
-    server.sendNotification(
+    await server.sendNotification(
       "window/showMessage",
       %*{
         "type": 3,
@@ -270,16 +301,16 @@ proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
   of "textDocument/hover":
     await server.handleHover(id, params)
   of "workspace/executeCommand":
-    server.handleExecuteCommand(id, params)
+    await server.handleExecuteCommand(id, params)
   of "shutdown":
     logInfo("Received shutdown request")
-    server.sendResponse(id, newJNull())
+    await server.sendResponse(id, newJNull())
   of "exit":
     logInfo("Received exit request, shutting down server")
     quit(0)
   else:
     logWarn("Unknown LSP method: " & methodName)
-    server.sendError(-32601, "Method not found: " & methodName, id)
+    await server.sendError(-32601, "Method not found: " & methodName, id)
 
 proc startServer*(server: LSPServer) {.async.} =
   logInfo("Starting LSP server main loop")
@@ -288,7 +319,7 @@ proc startServer*(server: LSPServer) {.async.} =
   while true:
     # Read input character by character to handle LSP protocol properly
     try:
-      let ch = stdin.readChar()
+      let ch = await server.read()
       buffer.add(ch)
     except EOFError:
       logInfo("EOF received, stopping server")
@@ -337,7 +368,7 @@ proc startServer*(server: LSPServer) {.async.} =
         await server.handleMessage(message)
       except JsonParsingError as e:
         logError("JSON parsing error: " & e.msg)
-        server.sendError(-32700, "Parse error", newJNull())
+        await server.sendError(-32700, "Parse error", newJNull())
       except Exception as e:
         logError("Internal server error: " & e.msg)
-        server.sendError(-32603, "Internal error", newJNull())
+        await server.sendError(-32603, "Internal error", newJNull())
