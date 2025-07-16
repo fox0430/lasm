@@ -7,6 +7,8 @@ type
   OptionalNode* = Option[JsonNode]
   uinteger* = range[0 .. (1 shl 31 - 1)]
 
+  LSPError* = object of CatchableError
+
   CancelParams* = ref object of RootObj
     id*: OptionalNode
 
