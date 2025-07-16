@@ -75,8 +75,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           var h = HoverConfig(enabled: hoverNode["enabled"].getBool(false))
 
           if h.enabled:
-            # Handle single content field
             if hoverNode.contains("content"):
+              # Handle single content field
               let
                 kind =
                   if hoverNode["content"].contains("kind"):
@@ -105,8 +105,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
 
                 hoverContent.position = some(Position(line: line, character: character))
               h.content = some(hoverContent)
-            # Handle contents array field
             elif hoverNode.contains("contents"):
+              # Handle contents array field
               h.contents = @[]
               for hoverContentNode in hoverNode["contents"]:
                 let
@@ -125,13 +125,13 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
                 if hoverContentNode.contains("position"):
                   let
                     line =
-                      if hoverNode["content"]["position"].contains("line"):
-                        hoverNode["content"]["position"]["line"].getInt
+                      if hoverContentNode["position"].contains("line"):
+                        hoverContentNode["position"]["line"].getInt
                       else:
                         0
                     character =
-                      if hoverNode["content"]["position"].contains("character"):
-                        hoverNode["content"]["position"]["character"].getInt(0)
+                      if hoverContentNode["position"].contains("character"):
+                        hoverContentNode["position"]["character"].getInt(0)
                       else:
                         0
 
