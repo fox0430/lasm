@@ -57,7 +57,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
     logDebug("Parsing JSON configuration (size: " & $configContent.len & " bytes)")
     let config = parseJson(configContent)
 
-    logDebug(fmt"Loaded JSON configuration: ${config}")
+    logDebug(fmt"Loaded JSON configuration: {config}")
 
     if config.hasKey("currentScenario"):
       sm.currentScenario = config["currentScenario"].getStr()

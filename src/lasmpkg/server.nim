@@ -26,7 +26,7 @@ proc sendMessage(server: LSPServer, message: JsonNode) =
     header = "Content-Length: " & $content.len & "\r\n\r\n"
     buf = header & content
 
-  logDebug(fmt"Send message: ${buf}")
+  logDebug(fmt"Send message: {buf}")
 
   stdout.write(buf)
   stdout.flushFile()
@@ -130,18 +130,26 @@ proc handleExecuteCommand(server: LSPServer, id: JsonNode, params: JsonNode) =
     server.sendError(-32601, "Unknown command: " & command, id)
 
 proc handleDidOpen(server: LSPServer, params: JsonNode) {.async.} =
-  let textDocument = params["textDocument"]
-  let uri = textDocument["uri"].getStr()
-  let content = textDocument["text"].getStr()
-  let version = textDocument["version"].getInt()
+  let
+    textDocument = params["textDocument"]
+    uri = textDocument["uri"].getStr
+    content = textDocument["text"].getStr
+    version = textDocument["version"].getInt
 
   server.documents[uri] = Document(content: content, version: version)
 
+  # Return notify for debug.
+  server.sendNotification(
+    "window/logMessage",
+    %*{"type": 5, "message": fmt"Received textDocument/didOpen notify: {params}"},
+  )
+
 proc handleDidChange(server: LSPServer, params: JsonNode) {.async.} =
-  let textDocument = params["textDocument"]
-  let uri = textDocument["uri"].getStr()
-  let version = textDocument["version"].getInt()
-  let contentChanges = params["contentChanges"]
+  let
+    textDocument = params["textDocument"]
+    uri = textDocument["uri"].getStr()
+    version = textDocument["version"].getInt()
+    contentChanges = params["contentChanges"]
 
   if uri in server.documents:
     for change in contentChanges.items():
@@ -154,10 +162,23 @@ proc handleDidChange(server: LSPServer, params: JsonNode) {.async.} =
 
     server.documents[uri].version = version
 
+  # Return notify for debug.
+  server.sendNotification(
+    "window/logMessage",
+    %*{"type": 5, "message": fmt"Received textDocument/didChange notify: {params}"},
+  )
+
 proc handleDidClose(server: LSPServer, params: JsonNode) {.async.} =
-  let textDocument = params["textDocument"]
-  let uri = textDocument["uri"].getStr()
+  let
+    textDocument = params["textDocument"]
+    uri = textDocument["uri"].getStr()
   server.documents.del(uri)
+
+  # Return notify for debug.
+  server.sendNotification(
+    "window/logMessage",
+    %*{"type": 5, "message": fmt"Received textDocument/didClose notify: {params}"},
+  )
 
 proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let scenario = server.scenarioManager.getCurrentScenario()
@@ -309,7 +330,7 @@ proc startServer*(server: LSPServer) {.async.} =
       let messageContent = buffer[messageStart ..< messageStart + contentLength]
       buffer = buffer[messageStart + contentLength ..^ 1]
 
-      logDebug(fmt"Received message: ${buffer}")
+      logDebug(fmt"Received message: {messageContent}")
 
       try:
         let message = parseJson(messageContent)
