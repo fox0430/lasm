@@ -2,11 +2,10 @@ import std/os
 
 import server
 
-type
-  AppConfig* = object
-    configPath*: string
-    enableFileLog*: bool
-    logPath*: string
+type AppConfig* = object
+  configPath*: string
+  enableFileLog*: bool
+  logPath*: string
 
 proc writeUsage*(isErr: bool = false) =
   const Text =
