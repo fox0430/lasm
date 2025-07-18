@@ -417,7 +417,8 @@ suite "lsp_handler module tests":
 
     # Add some test documents
     handler.documents["file:///test1.nim"] = Document(content: "content1", version: 1)
-    handler.documents["file:///test2.py"] = Document(content: "longer content", version: 2)
+    handler.documents["file:///test2.py"] =
+      Document(content: "longer content", version: 2)
 
     let params = %*{"command": "lsptest.listOpenFiles"}
 
@@ -450,45 +451,58 @@ suite "lsp_handler module tests":
     let handler = newLSPHandler(sm)
 
     # Test didOpen with count
-    let openParams = %*{
-      "textDocument": {
-        "uri": "file:///test.nim",
-        "languageId": "nim",
-        "version": 1,
-        "text": "echo \"hello\""
+    let openParams =
+      %*{
+        "textDocument": {
+          "uri": "file:///test.nim",
+          "languageId": "nim",
+          "version": 1,
+          "text": "echo \"hello\"",
+        }
       }
-    }
     let openNotifications = waitFor handler.handleDidOpen(openParams)
-    check openNotifications[0]["params"]["message"].getStr().contains("(total: 1 files)")
+    check openNotifications[0]["params"]["message"].getStr().contains(
+      "(total: 1 files)"
+    )
 
     # Test didChange with content length
-    let changeParams = %*{
-      "textDocument": {"uri": "file:///test.nim", "version": 2},
-      "contentChanges": [{"text": "new content"}]
-    }
+    let changeParams =
+      %*{
+        "textDocument": {"uri": "file:///test.nim", "version": 2},
+        "contentChanges": [{"text": "new content"}],
+      }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
-    check changeNotifications[0]["params"]["message"].getStr().contains("(v2, 11 chars)")
+    check changeNotifications[0]["params"]["message"].getStr().contains(
+      "(v2, 11 chars)"
+    )
 
     # Test didClose with remaining count
     let closeParams = %*{"textDocument": {"uri": "file:///test.nim"}}
     let closeNotifications = waitFor handler.handleDidClose(closeParams)
-    check closeNotifications[0]["params"]["message"].getStr().contains("(remaining: 0 files)")
+    check closeNotifications[0]["params"]["message"].getStr().contains(
+      "(remaining: 0 files)"
+    )
 
   test "didChange and didClose with non-existent files":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
     # Test didChange on non-existent file
-    let changeParams = %*{
-      "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
-      "contentChanges": [{"text": "content"}]
-    }
+    let changeParams =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+        "contentChanges": [{"text": "content"}],
+      }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
-    check changeNotifications[0]["params"]["type"].getInt() == 2  # Warning
-    check changeNotifications[0]["params"]["message"].getStr().contains("Warning: Attempted to update unopened document")
+    check changeNotifications[0]["params"]["type"].getInt() == 2 # Warning
+    check changeNotifications[0]["params"]["message"].getStr().contains(
+      "Warning: Attempted to update unopened document"
+    )
 
     # Test didClose on non-existent file
     let closeParams = %*{"textDocument": {"uri": "file:///nonexistent.nim"}}
     let closeNotifications = waitFor handler.handleDidClose(closeParams)
-    check closeNotifications[0]["params"]["type"].getInt() == 2  # Warning
-    check closeNotifications[0]["params"]["message"].getStr().contains("Warning: Attempted to close unopened document")
+    check closeNotifications[0]["params"]["type"].getInt() == 2 # Warning
+    check closeNotifications[0]["params"]["message"].getStr().contains(
+      "Warning: Attempted to close unopened document"
+    )

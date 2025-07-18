@@ -114,25 +114,30 @@ proc handleExecuteCommand*(
     return (response, notifications)
   of "lsptest.listOpenFiles":
     let openFiles = toSeq(handler.documents.keys()).map(
-      proc(uri: string): JsonNode =
-        let fileName = uri.split("/")[^1]
-        let doc = handler.documents[uri]
-        %*{"uri": uri, "fileName": fileName, "version": doc.version, "contentLength": doc.content.len}
-    )
+        proc(uri: string): JsonNode =
+          let fileName = uri.split("/")[^1]
+          let doc = handler.documents[uri]
+          %*{
+            "uri": uri,
+            "fileName": fileName,
+            "version": doc.version,
+            "contentLength": doc.content.len,
+          }
+      )
     let response = %openFiles
-    let fileNames = toSeq(handler.documents.keys()).map(
-      proc(uri: string): string =
-        uri.split("/")[^1]
-    ).join(", ")
-    let message = if handler.documents.len == 0:
-      "No files currently open"
-    else:
-      fmt"Open files ({handler.documents.len}): {fileNames}"
+    let fileNames = toSeq(handler.documents.keys())
+      .map(
+        proc(uri: string): string =
+          uri.split("/")[^1]
+      )
+      .join(", ")
+    let message =
+      if handler.documents.len == 0:
+        "No files currently open"
+      else:
+        fmt"Open files ({handler.documents.len}): {fileNames}"
     notifications.add(
-      %*{
-        "method": "window/showMessage",
-        "params": {"type": 3, "message": message},
-      }
+      %*{"method": "window/showMessage", "params": {"type": 3, "message": message}}
     )
     return (response, notifications)
   else:
@@ -148,7 +153,7 @@ proc handleDidOpen*(
     version = textDocument["version"].getInt
 
   handler.documents[uri] = Document(content: content, version: version)
-  
+
   let documentCount = handler.documents.len
   let fileName = uri.split("/")[^1]
 
@@ -156,8 +161,10 @@ proc handleDidOpen*(
     @[
       %*{
         "method": "window/logMessage",
-        "params":
-          {"type": 5, "message": fmt"Opened document: {fileName} (total: {documentCount} files)"},
+        "params": {
+          "type": 5,
+          "message": fmt"Opened document: {fileName} (total: {documentCount} files)",
+        },
       }
     ]
 
@@ -178,7 +185,7 @@ proc handleDidChange*(
         handler.documents[uri].content = change["text"].getStr()
 
     handler.documents[uri].version = version
-    
+
     let fileName = uri.split("/")[^1]
     let contentLength = handler.documents[uri].content.len
 
@@ -186,8 +193,11 @@ proc handleDidChange*(
       @[
         %*{
           "method": "window/logMessage",
-          "params":
-            {"type": 5, "message": fmt"Updated document: {fileName} (v{version}, {contentLength} chars)"},
+          "params": {
+            "type": 5,
+            "message":
+              fmt"Updated document: {fileName} (v{version}, {contentLength} chars)",
+          },
         }
       ]
   else:
@@ -196,8 +206,10 @@ proc handleDidChange*(
       @[
         %*{
           "method": "window/logMessage",
-          "params":
-            {"type": 2, "message": fmt"Warning: Attempted to update unopened document: {fileName}"},
+          "params": {
+            "type": 2,
+            "message": fmt"Warning: Attempted to update unopened document: {fileName}",
+          },
         }
       ]
 
@@ -207,18 +219,21 @@ proc handleDidClose*(
   let
     textDocument = params["textDocument"]
     uri = textDocument["uri"].getStr()
-    
+
   if uri in handler.documents:
     handler.documents.del(uri)
     let fileName = uri.split("/")[^1]
     let remainingCount = handler.documents.len
-    
+
     return
       @[
         %*{
           "method": "window/logMessage",
-          "params":
-            {"type": 5, "message": fmt"Closed document: {fileName} (remaining: {remainingCount} files)"},
+          "params": {
+            "type": 5,
+            "message":
+              fmt"Closed document: {fileName} (remaining: {remainingCount} files)",
+          },
         }
       ]
   else:
@@ -227,8 +242,10 @@ proc handleDidClose*(
       @[
         %*{
           "method": "window/logMessage",
-          "params":
-            {"type": 2, "message": fmt"Warning: Attempted to close unopened document: {fileName}"},
+          "params": {
+            "type": 2,
+            "message": fmt"Warning: Attempted to close unopened document: {fileName}",
+          },
         }
       ]
 
