@@ -1,1 +1,4 @@
 lasm
+
+tests/*
+!tests/*.*

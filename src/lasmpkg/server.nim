@@ -1,34 +1,29 @@
 import std/[strutils, strformat, json]
 
 import pkg/chronos
-import pkg/chronos/transports/stream
 
-import scenario, logger, lsp_handler
+import scenario, logger, lsp_handler, transport
 import protocol/types
 
 export tables, scenario
 
-type
-  Transports = ref object
-    input: StreamTransport
-    output: StreamTransport
+type LSPServer* = ref object
+  transport*: Transport
+  lspHandler*: LSPHandler
 
-  LSPServer = ref object
-    transports: Transports
-    lspHandler*: LSPHandler
-
-proc newLSPServer*(configPath: string = ""): LSPServer =
+proc newLSPServer*(configPath: string = "", transport: Transport = nil): LSPServer =
   ## LSP Server Implementation
   logInfo("Creating new LSP server with config: " & configPath)
 
   result = LSPServer()
 
-  const
-    STDIN_FD = 0
-    STDOUT_FD = 1
-  result.transports = Transports()
-  result.transports.input = fromPipe(AsyncFD(STDIN_FD))
-  result.transports.output = fromPipe(AsyncFD(STDOUT_FD))
+  # Use provided transport or create default stdio transport
+  if transport == nil:
+    result.transport = newLSPTransport()
+    logInfo("Created default stdio transport")
+  else:
+    result.transport = transport
+    logInfo("Using provided transport")
 
   logInfo("Initializing scenario manager")
   let scenarioManager = newScenarioManager(configPath)
@@ -36,16 +31,13 @@ proc newLSPServer*(configPath: string = ""): LSPServer =
 
   logInfo("LSP server created successfully")
 
-proc read(server: LSPServer): Future[char] {.async.} =
-  let r = await server.transports.input.read(1)
-  return char(r[0])
+proc readTransportChar*(server: LSPServer): Future[char] {.async.} =
+  return await server.transport.read()
 
-proc write(server: LSPServer, buf: string) {.async.} =
-  let r = await server.transports.output.write(buf)
-  if r == -1:
-    raise newException(IOError, "Failed to write messages")
+proc writeTransportData*(server: LSPServer, buf: string) {.async.} =
+  await server.transport.write(buf)
 
-proc sendMessage(server: LSPServer, message: JsonNode) {.async.} =
+proc sendMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let
     content = $message
     header = "Content-Length: " & $content.len & "\r\n\r\n"
@@ -54,28 +46,28 @@ proc sendMessage(server: LSPServer, message: JsonNode) {.async.} =
   logDebug(fmt"Send message: {buf}")
 
   try:
-    await server.write(buf)
+    await server.writeTransportData(buf)
   except IOError as e:
     logError(fmt"sendMessage: {e.msg}")
 
-proc sendResponse(server: LSPServer, id: JsonNode, r: JsonNode) {.async.} =
+proc sendResponse*(server: LSPServer, id: JsonNode, r: JsonNode) {.async.} =
   let response = %*{"jsonrpc": "2.0", "id": id, "result": r}
   await server.sendMessage(response)
 
-proc sendError(
+proc sendError*(
     server: LSPServer, code: int, message: string, id: JsonNode = newJNull()
 ) {.async.} =
   let response =
     %*{"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
   await server.sendMessage(response)
 
-proc sendNotification(
+proc sendNotification*(
     server: LSPServer, methodName: string, params: JsonNode
 ) {.async.} =
   let notification = %*{"jsonrpc": "2.0", "method": methodName, "params": params}
   await server.sendMessage(notification)
 
-proc handleInitialize(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+proc handleInitialize*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let response = await server.lspHandler.handleInitialize(id, params)
   await server.sendResponse(id, response)
 
@@ -119,7 +111,7 @@ proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
-proc handleMessage(server: LSPServer, message: JsonNode) {.async.} =
+proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
   let params =
     if message.hasKey("params"):
@@ -170,7 +162,7 @@ proc startServer*(server: LSPServer) {.async.} =
   while true:
     # Read input character by character to handle LSP protocol properly
     try:
-      let ch = await server.read()
+      let ch = await server.readTransportChar()
       buffer.add(ch)
     except EOFError:
       logInfo("EOF received, stopping server")

@@ -6,7 +6,7 @@ import protocol/types
 export tables, json
 
 type
-  HoverContent = object
+  HoverContent* = object
     kind*: string
     message*: string
     position: Option[Position]
