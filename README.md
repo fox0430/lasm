@@ -46,3 +46,13 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/didClose | |
 | textDocument/hover | |
 | textDocument/shutdown | |
+
+## Commands
+
+LASM provides several commands that can be executed through the LSP client:
+
+- `lsptest.switchScenario` - Switch to a different test scenario
+- `lsptest.listScenarios` - List all available scenarios
+- `lsptest.reloadConfig` - Reload configuration file
+- `lsptest.createSampleConfig` - Create a sample configuration file
+- `lsptest.listOpenFiles` - List all currently open files with details

@@ -28,7 +28,7 @@ proc handleInitialize*(
       "executeCommandProvider": {
         "commands": [
           "lsptest.switchScenario", "lsptest.listScenarios", "lsptest.reloadConfig",
-          "lsptest.createSampleConfig",
+          "lsptest.createSampleConfig", "lsptest.listOpenFiles",
         ]
       },
       "diagnosticProvider":
@@ -112,6 +112,34 @@ proc handleExecuteCommand*(
       }
     )
     return (response, notifications)
+  of "lsptest.listOpenFiles":
+    let openFiles = toSeq(handler.documents.keys()).map(
+        proc(uri: string): JsonNode =
+          let fileName = uri.split("/")[^1]
+          let doc = handler.documents[uri]
+          %*{
+            "uri": uri,
+            "fileName": fileName,
+            "version": doc.version,
+            "contentLength": doc.content.len,
+          }
+      )
+    let response = %openFiles
+    let fileNames = toSeq(handler.documents.keys())
+      .map(
+        proc(uri: string): string =
+          uri.split("/")[^1]
+      )
+      .join(", ")
+    let message =
+      if handler.documents.len == 0:
+        "No files currently open"
+      else:
+        fmt"Open files ({handler.documents.len}): {fileNames}"
+    notifications.add(
+      %*{"method": "window/showMessage", "params": {"type": 3, "message": message}}
+    )
+    return (response, notifications)
   else:
     raise newException(LSPError, "Unknown command: " & command)
 
@@ -126,12 +154,17 @@ proc handleDidOpen*(
 
   handler.documents[uri] = Document(content: content, version: version)
 
+  let documentCount = handler.documents.len
+  let fileName = uri.split("/")[^1]
+
   return
     @[
       %*{
         "method": "window/logMessage",
-        "params":
-          {"type": 5, "message": fmt"Received textDocument/didOpen notify: {params}"},
+        "params": {
+          "type": 5,
+          "message": fmt"Opened document: {fileName} (total: {documentCount} files)",
+        },
       }
     ]
 
@@ -153,14 +186,32 @@ proc handleDidChange*(
 
     handler.documents[uri].version = version
 
-  return
-    @[
-      %*{
-        "method": "window/logMessage",
-        "params":
-          {"type": 5, "message": fmt"Received textDocument/didChange notify: {params}"},
-      }
-    ]
+    let fileName = uri.split("/")[^1]
+    let contentLength = handler.documents[uri].content.len
+
+    return
+      @[
+        %*{
+          "method": "window/logMessage",
+          "params": {
+            "type": 5,
+            "message":
+              fmt"Updated document: {fileName} (v{version}, {contentLength} chars)",
+          },
+        }
+      ]
+  else:
+    let fileName = uri.split("/")[^1]
+    return
+      @[
+        %*{
+          "method": "window/logMessage",
+          "params": {
+            "type": 2,
+            "message": fmt"Warning: Attempted to update unopened document: {fileName}",
+          },
+        }
+      ]
 
 proc handleDidClose*(
     handler: LSPHandler, params: JsonNode
@@ -168,16 +219,35 @@ proc handleDidClose*(
   let
     textDocument = params["textDocument"]
     uri = textDocument["uri"].getStr()
-  handler.documents.del(uri)
 
-  return
-    @[
-      %*{
-        "method": "window/logMessage",
-        "params":
-          {"type": 5, "message": fmt"Received textDocument/didClose notify: {params}"},
-      }
-    ]
+  if uri in handler.documents:
+    handler.documents.del(uri)
+    let fileName = uri.split("/")[^1]
+    let remainingCount = handler.documents.len
+
+    return
+      @[
+        %*{
+          "method": "window/logMessage",
+          "params": {
+            "type": 5,
+            "message":
+              fmt"Closed document: {fileName} (remaining: {remainingCount} files)",
+          },
+        }
+      ]
+  else:
+    let fileName = uri.split("/")[^1]
+    return
+      @[
+        %*{
+          "method": "window/logMessage",
+          "params": {
+            "type": 2,
+            "message": fmt"Warning: Attempted to close unopened document: {fileName}",
+          },
+        }
+      ]
 
 proc handleHover*(
     handler: LSPHandler, id: JsonNode, params: JsonNode

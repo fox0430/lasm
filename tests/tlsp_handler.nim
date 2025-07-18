@@ -75,15 +75,15 @@ suite "lsp_handler module tests":
     let executeCommandProvider = capabilities["executeCommandProvider"]
     check executeCommandProvider.hasKey("commands")
     let commands = executeCommandProvider["commands"]
-    check commands.len == 4
+    check commands.len == 5
     var foundCommands = 0
     for cmd in commands:
       if cmd.getStr() in [
         "lsptest.switchScenario", "lsptest.listScenarios", "lsptest.reloadConfig",
-        "lsptest.createSampleConfig",
+        "lsptest.createSampleConfig", "lsptest.listOpenFiles",
       ]:
         foundCommands += 1
-    check foundCommands == 4
+    check foundCommands == 5
 
   test "handleExecuteCommand - switchScenario success":
     let sm = createTestScenarioManager()
@@ -396,3 +396,113 @@ suite "lsp_handler module tests":
     check handler.documents.len == 1
     check "file:///test1.nim" notin handler.documents
     check "file:///test2.nim" in handler.documents
+
+  test "handleExecuteCommand - listOpenFiles with no files":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"command": "lsptest.listOpenFiles"}
+
+    let (response, notifications) = waitFor handler.handleExecuteCommand(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0
+    check notifications.len == 1
+    check notifications[0]["method"].getStr() == "window/showMessage"
+    check notifications[0]["params"]["message"].getStr() == "No files currently open"
+
+  test "handleExecuteCommand - listOpenFiles with multiple files":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Add some test documents
+    handler.documents["file:///test1.nim"] = Document(content: "content1", version: 1)
+    handler.documents["file:///test2.py"] =
+      Document(content: "longer content", version: 2)
+
+    let params = %*{"command": "lsptest.listOpenFiles"}
+
+    let (response, notifications) = waitFor handler.handleExecuteCommand(%1, params)
+
+    check response.kind == JArray
+    check response.len == 2
+    check notifications.len == 1
+    check notifications[0]["method"].getStr() == "window/showMessage"
+    check notifications[0]["params"]["message"].getStr().contains("Open files (2):")
+    check notifications[0]["params"]["message"].getStr().contains("test1.nim")
+    check notifications[0]["params"]["message"].getStr().contains("test2.py")
+
+    # Check response structure
+    var foundTest1 = false
+    var foundTest2 = false
+    for item in response:
+      if item["fileName"].getStr() == "test1.nim":
+        foundTest1 = true
+        check item["version"].getInt() == 1
+        check item["contentLength"].getInt() == 8
+      elif item["fileName"].getStr() == "test2.py":
+        foundTest2 = true
+        check item["version"].getInt() == 2
+        check item["contentLength"].getInt() == 14
+    check foundTest1 and foundTest2
+
+  test "improved multi-file logging messages":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Test didOpen with count
+    let openParams =
+      %*{
+        "textDocument": {
+          "uri": "file:///test.nim",
+          "languageId": "nim",
+          "version": 1,
+          "text": "echo \"hello\"",
+        }
+      }
+    let openNotifications = waitFor handler.handleDidOpen(openParams)
+    check openNotifications[0]["params"]["message"].getStr().contains(
+      "(total: 1 files)"
+    )
+
+    # Test didChange with content length
+    let changeParams =
+      %*{
+        "textDocument": {"uri": "file:///test.nim", "version": 2},
+        "contentChanges": [{"text": "new content"}],
+      }
+    let changeNotifications = waitFor handler.handleDidChange(changeParams)
+    check changeNotifications[0]["params"]["message"].getStr().contains(
+      "(v2, 11 chars)"
+    )
+
+    # Test didClose with remaining count
+    let closeParams = %*{"textDocument": {"uri": "file:///test.nim"}}
+    let closeNotifications = waitFor handler.handleDidClose(closeParams)
+    check closeNotifications[0]["params"]["message"].getStr().contains(
+      "(remaining: 0 files)"
+    )
+
+  test "didChange and didClose with non-existent files":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Test didChange on non-existent file
+    let changeParams =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+        "contentChanges": [{"text": "content"}],
+      }
+    let changeNotifications = waitFor handler.handleDidChange(changeParams)
+    check changeNotifications[0]["params"]["type"].getInt() == 2 # Warning
+    check changeNotifications[0]["params"]["message"].getStr().contains(
+      "Warning: Attempted to update unopened document"
+    )
+
+    # Test didClose on non-existent file
+    let closeParams = %*{"textDocument": {"uri": "file:///nonexistent.nim"}}
+    let closeNotifications = waitFor handler.handleDidClose(closeParams)
+    check closeNotifications[0]["params"]["type"].getInt() == 2 # Warning
+    check closeNotifications[0]["params"]["message"].getStr().contains(
+      "Warning: Attempted to close unopened document"
+    )
