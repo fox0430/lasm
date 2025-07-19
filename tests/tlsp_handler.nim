@@ -506,3 +506,31 @@ suite "lsp_handler module tests":
     check closeNotifications[0]["params"]["message"].getStr().contains(
       "Warning: Attempted to close unopened document"
     )
+
+  test "handleDidChangeConfiguration with no settings":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Test with empty params
+    let params = %*{}
+
+    let notifications = waitFor handler.handleDidChangeConfiguration(params)
+
+    check notifications.len == 1
+    check notifications[0]["params"]["message"].getStr() ==
+      "Received workspace/didChangeConfiguration notification"
+    check sm.currentScenario == "default" # Should remain unchanged
+
+  test "handleDidChangeConfiguration with non-lsptest settings":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Test with settings that don't include lsptest
+    let params = %*{"settings": {"other": {"config": "value"}}}
+
+    let notifications = waitFor handler.handleDidChangeConfiguration(params)
+
+    check notifications.len == 1
+    check notifications[0]["params"]["message"].getStr() ==
+      "Received workspace/didChangeConfiguration notification"
+    check sm.currentScenario == "default" # Should remain unchanged
