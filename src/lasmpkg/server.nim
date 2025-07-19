@@ -104,6 +104,13 @@ proc handleDidClose(server: LSPServer, params: JsonNode) {.async.} =
       notification["method"].getStr(), notification["params"]
     )
 
+proc handleDidChangeConfiguration(server: LSPServer, params: JsonNode) {.async.} =
+  let notifications = await server.lspHandler.handleDidChangeConfiguration(params)
+  for notification in notifications:
+    await server.sendNotification(
+      notification["method"].getStr(), notification["params"]
+    )
+
 proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleHover(id, params)
@@ -145,6 +152,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleHover(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
+  of "workspace/didChangeConfiguration":
+    await server.handleDidChangeConfiguration(params)
   of "shutdown":
     logInfo("Received shutdown request")
     await server.sendResponse(id, newJNull())

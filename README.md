@@ -41,6 +41,8 @@ See `lsp-test-config-sample.json` for examples.
 |--|--|
 | initialize | |
 | initialized | |
+| workspace/didChangeConfiguration | |
+| textDocument/didOpen | |
 | textDocument/didOpen | |
 | textDocument/didChange | |
 | textDocument/didClose | |

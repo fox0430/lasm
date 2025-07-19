@@ -310,3 +310,21 @@ proc handleInitialized*(handler: LSPHandler): seq[JsonNode] =
         },
       }
     ]
+
+proc handleDidChangeConfiguration*(
+    handler: LSPHandler, params: JsonNode
+): Future[seq[JsonNode]] {.async.} =
+  logInfo("Received workspace/didChangeConfiguration with settings: " & $params)
+
+  var notifications: seq[JsonNode] = @[]
+
+  # Log the configuration change
+  notifications.add(
+    %*{
+      "method": "window/logMessage",
+      "params":
+        {"type": 5, "message": "Received workspace/didChangeConfiguration notification"},
+    }
+  )
+
+  return notifications
