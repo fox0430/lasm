@@ -1,4 +1,4 @@
-import std/os
+import std/[os, pegs, strformat]
 
 import server
 
@@ -6,6 +6,23 @@ type AppConfig* = object
   configPath*: string
   enableFileLog*: bool
   logPath*: string
+
+proc staticReadVersionFromNimble(): string {.compileTime.} =
+  ## Get the version from nimble file.
+
+  let
+    peg = """@ "version" \s* "=" \s* \" {[0-9.]+} \" @ $""".peg
+
+    nimblePath = currentSourcePath.parentDir() / "../../lasm.nimble"
+    nimbleSpec = staticRead(nimblePath)
+
+  var captures: seq[string] = @[""]
+  assert nimbleSpec.match(peg, captures)
+  assert captures.len == 1
+  return captures[0]
+
+proc writeVersion() =
+  echo staticReadVersionFromNimble()
 
 proc writeUsage*(isErr: bool = false) =
   const Text =
@@ -30,6 +47,10 @@ proc writeNoConfigError*() =
 
 proc writeUnknownOptionError*(param: string) =
   stderr.writeLine("Error: Unknown option '" & param & "'")
+  writeUsage(true)
+
+proc unknownOptionError(s: string) =
+  stderr.writeLine(fmt"Unknown option argument: {s}")
   writeUsage(true)
 
 proc parseCliParams*(): AppConfig =
@@ -57,6 +78,9 @@ proc parseCliParams*(): AppConfig =
     of "-h", "--help":
       writeUsage()
       quit(0)
+    of "-v", "--version":
+      writeVersion()
     else:
+      unknownOptionError(param)
       quit(1)
     inc i
