@@ -16,8 +16,23 @@ type
     content*: Option[HoverContent]
     contents*: seq[HoverContent]
 
+  CompletionContent* = object
+    label*: string
+    kind*: int # CompletionItemKind
+    detail*: Option[string]
+    documentation*: Option[string]
+    insertText*: Option[string]
+    sortText*: Option[string]
+    filterText*: Option[string]
+
+  CompletionConfig* = object
+    enabled*: bool
+    items*: seq[CompletionContent]
+    isIncomplete*: bool
+
   DelayConfig* = object
     hover*: int
+    completion*: int
 
   ErrorConfig* = object
     code*: int
@@ -30,6 +45,7 @@ type
   Scenario* = object
     name*: string
     hover*: HoverConfig
+    completion*: CompletionConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -141,10 +157,44 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
 
           scenario.hover = h
 
+        if scenarioData.hasKey("completion"):
+          # Load completion configuration
+          let completionNode = scenarioData["completion"]
+          var c = CompletionConfig(
+            enabled: completionNode["enabled"].getBool(false),
+            isIncomplete: completionNode{"isIncomplete"}.getBool(false),
+          )
+          if c.enabled and completionNode.contains("items"):
+            c.items = @[]
+            for itemNode in completionNode["items"]:
+              var item = CompletionContent(
+                label: itemNode["label"].getStr(""),
+                kind: itemNode{"kind"}.getInt(1), # Default to Text
+              )
+              if itemNode.contains("detail"):
+                item.detail = some(itemNode["detail"].getStr())
+              if itemNode.contains("documentation"):
+                item.documentation = some(itemNode["documentation"].getStr())
+              if itemNode.contains("insertText"):
+                item.insertText = some(itemNode["insertText"].getStr())
+              if itemNode.contains("sortText"):
+                item.sortText = some(itemNode["sortText"].getStr())
+              if itemNode.contains("filterText"):
+                item.filterText = some(itemNode["filterText"].getStr())
+              c.items.add(item)
+          scenario.completion = c
+        else:
+          # Default completion config if not specified
+          scenario.completion =
+            CompletionConfig(enabled: false, isIncomplete: false, items: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
-          scenario.delays = DelayConfig(hover: delaysNode["hover"].getInt(0))
+          scenario.delays = DelayConfig(
+            hover: delaysNode["hover"].getInt(0),
+            completion: delaysNode["completion"].getInt(0),
+          )
 
         if scenarioData.hasKey("errors"):
           # Load error configuration
@@ -214,6 +264,34 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "message": "**Default Symbol**\n\nThis is a default test symbol.",
                 "position": {"line": 0, "character": 0},
               }
+            ],
+          },
+          "completion": {
+            "enabled": true,
+            "isIncomplete": false,
+            "items": [
+              {
+                "label": "println",
+                "kind": 3,
+                "detail": "func println(message: string)",
+                "documentation": "Prints a message to the console",
+                "insertText": "println(${1:message})",
+                "sortText": "1",
+              },
+              {
+                "label": "variable",
+                "kind": 6,
+                "detail": "var variable: int",
+                "documentation": "A sample variable",
+                "insertText": "variable",
+              },
+              {
+                "label": "TestClass",
+                "kind": 7,
+                "detail": "class TestClass",
+                "documentation": "A test class for completion",
+                "insertText": "TestClass",
+              },
             ],
           },
           "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
