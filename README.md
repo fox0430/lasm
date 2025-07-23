@@ -43,10 +43,10 @@ See `lsp-test-config-sample.json` for examples.
 | initialized | |
 | workspace/didChangeConfiguration | |
 | textDocument/didOpen | |
-| textDocument/didOpen | |
 | textDocument/didChange | |
 | textDocument/didClose | |
 | textDocument/hover | |
+| textDocument/completion | |
 | textDocument/shutdown | |
 
 ## Commands

@@ -192,18 +192,25 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
           scenario.delays = DelayConfig(
-            hover: delaysNode["hover"].getInt(0),
-            completion: delaysNode["completion"].getInt(0),
+            hover: delaysNode{"hover"}.getInt(0),
+            completion: delaysNode{"completion"}.getInt(0),
           )
+        else:
+          # Default delay config if not specified
+          scenario.delays = DelayConfig(hover: 0, completion: 0)
 
         if scenarioData.hasKey("errors"):
           # Load error configuration
           let errorsNode = scenarioData["errors"]
+          scenario.errors = initTable[string, ErrorConfig]()
           for errorType, errorData in errorsNode.pairs():
             scenario.errors[errorType] = ErrorConfig(
               code: errorData["code"].getInt(-32603),
               message: errorData["message"].getStr("Unknown error"),
             )
+        else:
+          # Default empty errors table if not specified
+          scenario.errors = initTable[string, ErrorConfig]()
 
         sm.scenarios[scenarioName] = scenario
 
