@@ -376,6 +376,57 @@ proc handleHover*(
 
   return %hover
 
+proc handleCompletion*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.completion > 0:
+    await sleepAsync(scenario.delays.completion.milliseconds)
+
+  # Check if completion is enabled
+  if not scenario.completion.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "completion" in scenario.errors:
+    let error = scenario.errors["completion"]
+    raise newException(LSPError, error.message)
+
+  # Create completion list
+  let completionList = CompletionList()
+  completionList.isIncomplete = scenario.completion.isIncomplete
+  completionList.items = some(newSeq[CompletionItem]())
+
+  # Convert scenario items to LSP CompletionItems
+  for item in scenario.completion.items:
+    let completionItem = CompletionItem()
+    completionItem.label = item.label
+    completionItem.kind = some(item.kind)
+
+    if item.detail.isSome:
+      completionItem.detail = item.detail
+
+    if item.documentation.isSome:
+      completionItem.documentation = some(%item.documentation.get)
+
+    if item.insertText.isSome:
+      completionItem.insertText = item.insertText
+    else:
+      # Default to label if no insertText specified
+      completionItem.insertText = some(item.label)
+
+    if item.sortText.isSome:
+      completionItem.sortText = item.sortText
+
+    if item.filterText.isSome:
+      completionItem.filterText = item.filterText
+
+    completionList.items.get.add(completionItem)
+
+  return %completionList
+
 proc handleInitialized*(handler: LSPHandler): seq[JsonNode] =
   # Create the ShowMessageParams using protocol types
   let showMessageParams = ShowMessageParams()

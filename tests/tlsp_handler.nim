@@ -15,7 +15,8 @@ proc createTestScenarioManager(): ScenarioManager =
   result.scenarios["default"] = Scenario(
     name: "Default Test",
     hover: HoverConfig(enabled: true, content: none(HoverContent), contents: @[]),
-    delays: DelayConfig(hover: 0),
+    completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
+    delays: DelayConfig(hover: 0, completion: 0),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -23,7 +24,28 @@ proc createTestScenarioManager(): ScenarioManager =
   result.scenarios["test"] = Scenario(
     name: "Test Scenario",
     hover: HoverConfig(enabled: true, content: none(HoverContent), contents: @[]),
-    delays: DelayConfig(hover: 50),
+    completion: CompletionConfig(
+      enabled: true,
+      isIncomplete: false,
+      items:
+        @[
+          CompletionContent(
+            label: "testFunc",
+            kind: 3, # Function
+            detail: some("func testFunc(x: int): string"),
+            documentation: some("Test function for completion"),
+            insertText: some("testFunc(${1:x})"),
+            sortText: some("1"),
+          ),
+          CompletionContent(
+            label: "testVar",
+            kind: 6, # Variable
+            detail: some("var testVar: bool"),
+            documentation: some("Test variable"),
+          ),
+        ],
+    ),
+    delays: DelayConfig(hover: 50, completion: 30),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -31,8 +53,12 @@ proc createTestScenarioManager(): ScenarioManager =
   result.scenarios["error"] = Scenario(
     name: "Error Test",
     hover: HoverConfig(enabled: true),
-    delays: DelayConfig(hover: 0),
-    errors: {"hover": ErrorConfig(code: -32603, message: "Test error")}.toTable,
+    completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
+    delays: DelayConfig(hover: 0, completion: 0),
+    errors: {
+      "hover": ErrorConfig(code: -32603, message: "Test error"),
+      "completion": ErrorConfig(code: -32602, message: "Completion error"),
+    }.toTable,
   )
 
 suite "lsp_handler module tests":
@@ -344,6 +370,138 @@ suite "lsp_handler module tests":
     check duration >= 40
 
     check response.hasKey("contents")
+
+  test "handleCompletion with enabled completion":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has completion items
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 5, "character": 10},
+      }
+
+    let response = waitFor handler.handleCompletion(%1, params)
+
+    check response.hasKey("isIncomplete")
+    check response["isIncomplete"].getBool() == false
+    check response.hasKey("items")
+
+    let items = response["items"]
+    check items.kind == JArray
+    check items.len == 2
+
+    # Check first item (testFunc)
+    let item1 = items[0]
+    check item1["label"].getStr() == "testFunc"
+    check item1["kind"].getInt() == 3
+    check item1["detail"].getStr() == "func testFunc(x: int): string"
+    check item1["documentation"].getStr() == "Test function for completion"
+    check item1["insertText"].getStr() == "testFunc(${1:x})"
+    check item1["sortText"].getStr() == "1"
+
+    # Check second item (testVar)
+    let item2 = items[1]
+    check item2["label"].getStr() == "testVar"
+    check item2["kind"].getInt() == 6
+    check item2["detail"].getStr() == "var testVar: bool"
+    check item2["documentation"].getStr() == "Test variable"
+    check item2["insertText"].getStr() == "testVar" # Defaults to label
+
+  test "handleCompletion with disabled completion":
+    let sm = createTestScenarioManager()
+    # Set scenario with disabled completion
+    sm.scenarios["disabled"] = Scenario(
+      name: "Disabled Completion",
+      hover: HoverConfig(enabled: true),
+      completion: CompletionConfig(enabled: false),
+      delays: DelayConfig(hover: 0, completion: 0),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "disabled"
+
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleCompletion(%1, params)
+
+    check response.kind == JNull
+
+  test "handleCompletion with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    expect LSPError:
+      discard waitFor handler.handleCompletion(%1, params)
+
+  test "handleCompletion with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 30ms delay for completion
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCompletion(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 20ms due to 30ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 20
+
+    check response.hasKey("items")
+
+  test "handleCompletion with incomplete list":
+    let sm = createTestScenarioManager()
+    # Set scenario with incomplete completion list
+    sm.scenarios["incomplete"] = Scenario(
+      name: "Incomplete Completion",
+      hover: HoverConfig(enabled: true),
+      completion: CompletionConfig(
+        enabled: true,
+        isIncomplete: true,
+        items:
+          @[
+            CompletionContent(
+              label: "partialItem", kind: 1 # Text
+            )
+          ],
+      ),
+      delays: DelayConfig(hover: 0, completion: 0),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "incomplete"
+
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleCompletion(%1, params)
+
+    check response["isIncomplete"].getBool() == true
+    check response["items"].len == 1
+    check response["items"][0]["label"].getStr() == "partialItem"
 
   test "handleInitialized returns notification":
     let sm = createTestScenarioManager()
