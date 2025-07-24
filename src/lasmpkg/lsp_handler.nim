@@ -77,6 +77,10 @@ proc handleInitialize*(
 
   serverCapabilities.semanticTokensProvider = some(semanticTokensOptions)
 
+  # Set inlay hint provider
+  let inlayHintOptions = InlayHintOptions(resolveProvider: some(false))
+  serverCapabilities.inlayHintProvider = some(inlayHintOptions)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -668,3 +672,60 @@ proc handleSemanticTokensRange*(
   # For simplicity, return the same as full semantic tokens
   # In a real implementation, this would filter tokens by range
   return await handler.handleSemanticTokensFull(id, params)
+
+proc handleInlayHint*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.inlayHint > 0:
+    await sleepAsync(scenario.delays.inlayHint.milliseconds)
+
+  # Check if inlay hints are enabled
+  if not scenario.inlayHint.enabled:
+    return %(@[])
+
+  # Check for error injection
+  if "inlayHint" in scenario.errors:
+    let error = scenario.errors["inlayHint"]
+    raise newException(LSPError, error.message)
+
+  # Extract text document URI and range
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let rangeNode = params["range"]
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create inlay hints from scenario configuration
+    var hints: seq[JsonNode] = @[]
+
+    for hintContent in scenario.inlayHint.hints:
+      let hint = InlayHint()
+      hint.position = hintContent.position
+      hint.label = hintContent.label
+
+      if hintContent.kind.isSome:
+        hint.kind = hintContent.kind
+
+      if hintContent.tooltip.isSome:
+        hint.tooltip = hintContent.tooltip
+
+      if hintContent.paddingLeft.isSome:
+        hint.paddingLeft = hintContent.paddingLeft
+
+      if hintContent.paddingRight.isSome:
+        hint.paddingRight = hintContent.paddingRight
+
+      if hintContent.textEdits.len > 0:
+        hint.textEdits = some(hintContent.textEdits)
+
+      hints.add(%hint)
+
+    return %hints
+  else:
+    # Document not found, return empty hints
+    return %(@[])

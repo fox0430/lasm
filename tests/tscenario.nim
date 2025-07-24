@@ -35,7 +35,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -158,7 +160,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -176,7 +180,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -194,7 +200,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -221,7 +229,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 50, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 50, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -231,7 +241,9 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -300,13 +312,15 @@ suite "scenario module tests":
     check errorConfig.message == "Invalid params"
 
   test "DelayConfig initialization":
-    let delayConfig =
-      DelayConfig(hover: 150, completion: 100, diagnostics: 200, semanticTokens: 75)
+    let delayConfig = DelayConfig(
+      hover: 150, completion: 100, diagnostics: 200, semanticTokens: 75, inlayHint: 50
+    )
 
     check delayConfig.hover == 150
     check delayConfig.completion == 100
     check delayConfig.diagnostics == 200
     check delayConfig.semanticTokens == 75
+    check delayConfig.inlayHint == 50
 
   test "SemanticTokensConfig initialization":
     let semanticTokensConfig = SemanticTokensConfig(
@@ -685,8 +699,13 @@ suite "scenario module tests":
             "hover": {"enabled": false},
             "completion": {"enabled": false, "items": []},
             "diagnostics": {"enabled": false, "diagnostics": []},
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+            },
           }
         },
       }
@@ -702,3 +721,259 @@ suite "scenario module tests":
     let scenario = sm.scenarios["no_semantic_config"]
     check scenario.semanticTokens.enabled == false
     check scenario.semanticTokens.tokens.len == 0
+
+  test "InlayHintConfig initialization":
+    let position = Position(line: 5, character: 10)
+    let textEdit = TextEdit()
+    textEdit.newText = "new text"
+    textEdit.range = Range(
+      start: Position(line: 1, character: 0), `end`: Position(line: 1, character: 5)
+    )
+
+    let hintContent = InlayHintContent(
+      position: position,
+      label: ": string",
+      kind: some(1),
+      tooltip: some("Type annotation"),
+      paddingLeft: some(false),
+      paddingRight: some(true),
+      textEdits: @[textEdit],
+    )
+
+    let inlayHintConfig = InlayHintConfig(enabled: true, hints: @[hintContent])
+
+    check inlayHintConfig.enabled == true
+    check inlayHintConfig.hints.len == 1
+    check inlayHintConfig.hints[0].position.line == 5
+    check inlayHintConfig.hints[0].position.character == 10
+    check inlayHintConfig.hints[0].label == ": string"
+    check inlayHintConfig.hints[0].kind.get == 1
+    check inlayHintConfig.hints[0].tooltip.get == "Type annotation"
+    check inlayHintConfig.hints[0].paddingLeft.get == false
+    check inlayHintConfig.hints[0].paddingRight.get == true
+    check inlayHintConfig.hints[0].textEdits.len == 1
+    check inlayHintConfig.hints[0].textEdits[0].newText == "new text"
+
+  test "loadConfigFile with inlay hint configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_inlay_hint_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "inlay_hint_test",
+        "scenarios": {
+          "inlay_hint_test": {
+            "name": "Inlay Hint Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {
+              "enabled": true,
+              "hints": [
+                {
+                  "position": {"line": 1, "character": 20},
+                  "label": ": string",
+                  "kind": 1,
+                  "tooltip": "Type annotation for parameter",
+                  "paddingLeft": false,
+                  "paddingRight": false,
+                  "textEdits": [
+                    {
+                      "range": {
+                        "start": {"line": 1, "character": 15},
+                        "end": {"line": 1, "character": 20},
+                      },
+                      "newText": "param",
+                    }
+                  ],
+                },
+                {
+                  "position": {"line": 3, "character": 15},
+                  "label": " -> void",
+                  "kind": 1,
+                  "tooltip": "Return type annotation",
+                  "paddingLeft": true,
+                  "paddingRight": false,
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 75,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "inlay_hint_test"
+    check sm.scenarios.len == 1
+    check "inlay_hint_test" in sm.scenarios
+
+    let scenario = sm.scenarios["inlay_hint_test"]
+    check scenario.name == "Inlay Hint Test Scenario"
+    check scenario.inlayHint.enabled == true
+    check scenario.inlayHint.hints.len == 2
+    check scenario.delays.inlayHint == 75
+
+    # Check first hint
+    let hint1 = scenario.inlayHint.hints[0]
+    check hint1.position.line == 1
+    check hint1.position.character == 20
+    check hint1.label == ": string"
+    check hint1.kind.get == 1
+    check hint1.tooltip.get == "Type annotation for parameter"
+    check hint1.paddingLeft.get == false
+    check hint1.paddingRight.get == false
+    check hint1.textEdits.len == 1
+    check hint1.textEdits[0].newText == "param"
+    check hint1.textEdits[0].range.start.line == 1
+    check hint1.textEdits[0].range.start.character == 15
+
+    # Check second hint
+    let hint2 = scenario.inlayHint.hints[1]
+    check hint2.position.line == 3
+    check hint2.position.character == 15
+    check hint2.label == " -> void"
+    check hint2.kind.get == 1
+    check hint2.tooltip.get == "Return type annotation"
+    check hint2.paddingLeft.get == true
+    check hint2.paddingRight.get == false
+    check hint2.textEdits.len == 0
+
+  test "loadConfigFile with disabled inlay hints":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_inlay_hint_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_inlay_hints",
+        "scenarios": {
+          "no_inlay_hints": {
+            "name": "No Inlay Hints Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_inlay_hints"]
+    check scenario.inlayHint.enabled == false
+    check scenario.inlayHint.hints.len == 0
+
+  test "loadConfigFile without inlay hint configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_inlay_hint_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_inlay_config",
+        "scenarios": {
+          "no_inlay_config": {
+            "name": "No Inlay Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_inlay_config"]
+    check scenario.inlayHint.enabled == false
+    check scenario.inlayHint.hints.len == 0
+
+  test "loadConfigFile with minimal inlay hint configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_inlay_hint_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_inlay",
+        "scenarios": {
+          "minimal_inlay": {
+            "name": "Minimal Inlay Hint Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {
+              "enabled": true,
+              "hints": [{"position": {"line": 0, "character": 10}, "label": ": int"}],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_inlay"]
+    check scenario.inlayHint.enabled == true
+    check scenario.inlayHint.hints.len == 1
+
+    let hint = scenario.inlayHint.hints[0]
+    check hint.position.line == 0
+    check hint.position.character == 10
+    check hint.label == ": int"
+    # Optional fields should be none/empty
+    check hint.kind.isNone
+    check hint.tooltip.isNone
+    check hint.paddingLeft.isNone
+    check hint.paddingRight.isNone
+    check hint.textEdits.len == 0

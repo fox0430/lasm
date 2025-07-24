@@ -47,11 +47,25 @@ type
     enabled*: bool
     tokens*: seq[uinteger]
 
+  InlayHintContent* = object
+    position*: Position
+    label*: string
+    kind*: Option[int] # InlayHintKind
+    tooltip*: Option[string]
+    paddingLeft*: Option[bool]
+    paddingRight*: Option[bool]
+    textEdits*: seq[TextEdit]
+
+  InlayHintConfig* = object
+    enabled*: bool
+    hints*: seq[InlayHintContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
     diagnostics*: int
     semanticTokens*: int
+    inlayHint*: int
 
   ErrorConfig* = object
     code*: int
@@ -67,6 +81,7 @@ type
     completion*: CompletionConfig
     diagnostics*: DiagnosticConfig
     semanticTokens*: SemanticTokensConfig
+    inlayHint*: InlayHintConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -297,6 +312,58 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default semantic tokens config if not specified
           scenario.semanticTokens = SemanticTokensConfig(enabled: false, tokens: @[])
 
+        if scenarioData.hasKey("inlayHint"):
+          # Load inlay hint configuration
+          let inlayHintNode = scenarioData["inlayHint"]
+          var ih = InlayHintConfig(enabled: inlayHintNode["enabled"].getBool(false))
+          if ih.enabled and inlayHintNode.contains("hints"):
+            ih.hints = @[]
+            for hintNode in inlayHintNode["hints"]:
+              var hint = InlayHintContent(
+                label: hintNode["label"].getStr(""),
+                position: Position(
+                  line: uinteger(hintNode["position"]["line"].getInt(0)),
+                  character: uinteger(hintNode["position"]["character"].getInt(0)),
+                ),
+              )
+
+              if hintNode.contains("kind"):
+                hint.kind = some(hintNode["kind"].getInt())
+
+              if hintNode.contains("tooltip"):
+                hint.tooltip = some(hintNode["tooltip"].getStr())
+
+              if hintNode.contains("paddingLeft"):
+                hint.paddingLeft = some(hintNode["paddingLeft"].getBool())
+
+              if hintNode.contains("paddingRight"):
+                hint.paddingRight = some(hintNode["paddingRight"].getBool())
+
+              if hintNode.contains("textEdits"):
+                hint.textEdits = @[]
+                for editNode in hintNode["textEdits"]:
+                  let textEdit = TextEdit()
+                  textEdit.newText = editNode["newText"].getStr("")
+                  textEdit.range = Range(
+                    start: Position(
+                      line: uinteger(editNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(editNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(editNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(editNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  )
+                  hint.textEdits.add(textEdit)
+
+              ih.hints.add(hint)
+          scenario.inlayHint = ih
+        else:
+          # Default inlay hint config if not specified
+          scenario.inlayHint = InlayHintConfig(enabled: false, hints: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -305,11 +372,13 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             completion: delaysNode{"completion"}.getInt(0),
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
+            inlayHint: delaysNode{"inlayHint"}.getInt(0),
           )
         else:
           # Default delay config if not specified
-          scenario.delays =
-            DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0)
+          scenario.delays = DelayConfig(
+            hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+          )
 
         if scenarioData.hasKey("errors"):
           # Load error configuration
@@ -439,8 +508,34 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
             ],
           },
-          "delays":
-            {"completion": 100, "diagnostics": 200, "hover": 50, "semanticTokens": 30},
+          "inlayHint": {
+            "enabled": true,
+            "hints": [
+              {
+                "position": {"line": 1, "character": 20},
+                "label": ": string",
+                "kind": 1,
+                "tooltip": "Type annotation for parameter",
+                "paddingLeft": false,
+                "paddingRight": false,
+              },
+              {
+                "position": {"line": 3, "character": 15},
+                "label": " -> void",
+                "kind": 1,
+                "tooltip": "Return type annotation",
+                "paddingLeft": true,
+                "paddingRight": false,
+              },
+            ],
+          },
+          "delays": {
+            "completion": 100,
+            "diagnostics": 200,
+            "hover": 50,
+            "semanticTokens": 30,
+            "inlayHint": 25,
+          },
           "semanticTokens": {
             "enabled": true,
             "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
