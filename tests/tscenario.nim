@@ -1,6 +1,7 @@
 import std/[unittest, json, os, tables, options]
 
 import ../src/lasmpkg/[scenario, logger]
+import ../src/lasmpkg/protocol/types
 
 suite "scenario module tests":
   setup:
@@ -31,7 +32,9 @@ suite "scenario module tests":
     let scenario = Scenario(
       name: "test_scenario",
       hover: HoverConfig(enabled: true),
-      delays: DelayConfig(hover: 100),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -61,7 +64,8 @@ suite "scenario module tests":
               "enabled": true,
               "content": {"kind": "markdown", "message": "Test hover message"},
             },
-            "delays": {"hover": 50},
+            "completion": {"enabled": false, "items": []},
+            "delays": {"hover": 50, "completion": 0, "diagnostics": 0},
             "errors": {"hover": {"code": -32603, "message": "Test error"}},
           }
         },
@@ -108,7 +112,8 @@ suite "scenario module tests":
                 {"kind": "plaintext", "message": "Second content"},
               ],
             },
-            "delays": {"hover": 25},
+            "completion": {"enabled": false, "items": []},
+            "delays": {"hover": 25, "completion": 0, "diagnostics": 0},
           }
         },
       }
@@ -147,7 +152,9 @@ suite "scenario module tests":
     sm.scenarios["default"] = Scenario(
       name: "Default Scenario",
       hover: HoverConfig(enabled: false),
-      delays: DelayConfig(hover: 0),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -162,7 +169,9 @@ suite "scenario module tests":
     sm.scenarios["test"] = Scenario(
       name: "Test Scenario",
       hover: HoverConfig(enabled: true),
-      delays: DelayConfig(hover: 100),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -177,7 +186,9 @@ suite "scenario module tests":
     sm.scenarios["test"] = Scenario(
       name: "Test Scenario",
       hover: HoverConfig(enabled: true),
-      delays: DelayConfig(hover: 100),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -201,14 +212,18 @@ suite "scenario module tests":
     sm.scenarios["scenario1"] = Scenario(
       name: "First Scenario",
       hover: HoverConfig(enabled: true),
-      delays: DelayConfig(hover: 50),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 50, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
     sm.scenarios["scenario2"] = Scenario(
       name: "Second Scenario",
       hover: HoverConfig(enabled: false),
-      delays: DelayConfig(hover: 100),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -254,7 +269,13 @@ suite "scenario module tests":
       let defaultScenario = config["scenarios"]["default"]
       check defaultScenario.hasKey("name")
       check defaultScenario.hasKey("hover")
+      check defaultScenario.hasKey("completion")
+      check defaultScenario.hasKey("diagnostics")
       check defaultScenario.hasKey("delays")
+
+      # Verify diagnostics are enabled by default in sample config
+      check defaultScenario["diagnostics"]["enabled"].getBool() == true
+      check defaultScenario["diagnostics"]["diagnostics"].len > 0
     finally:
       setCurrentDir(originalDir)
 
@@ -271,9 +292,11 @@ suite "scenario module tests":
     check errorConfig.message == "Invalid params"
 
   test "DelayConfig initialization":
-    let delayConfig = DelayConfig(hover: 150)
+    let delayConfig = DelayConfig(hover: 150, completion: 100, diagnostics: 200)
 
     check delayConfig.hover == 150
+    check delayConfig.completion == 100
+    check delayConfig.diagnostics == 200
 
   test "loadConfigFile with empty scenarios":
     let tempDir = getTempDir()
@@ -312,3 +335,235 @@ suite "scenario module tests":
     let result = sm.loadConfigFile(configPath)
     check result == true
     check sm.currentScenario == "original" # Should remain unchanged
+
+  test "DiagnosticConfig initialization":
+    let diagContent = DiagnosticContent(
+      range: Range(
+        start: Position(line: 1, character: 5), `end`: Position(line: 1, character: 10)
+      ),
+      severity: 1,
+      code: some("E001"),
+      source: some("test"),
+      message: "Test diagnostic message",
+      tags: @[1, 2],
+      relatedInformation: @[],
+    )
+
+    let diagConfig = DiagnosticConfig(enabled: true, diagnostics: @[diagContent])
+
+    check diagConfig.enabled == true
+    check diagConfig.diagnostics.len == 1
+    check diagConfig.diagnostics[0].message == "Test diagnostic message"
+    check diagConfig.diagnostics[0].severity == 1
+    check diagConfig.diagnostics[0].code.get == "E001"
+    check diagConfig.diagnostics[0].source.get == "test"
+    check diagConfig.diagnostics[0].tags.len == 2
+
+  test "loadConfigFile with diagnostic configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_diagnostic_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "diagnostic_test",
+        "scenarios": {
+          "diagnostic_test": {
+            "name": "Diagnostic Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {
+              "enabled": true,
+              "diagnostics": [
+                {
+                  "range": {
+                    "start": {"line": 2, "character": 10},
+                    "end": {"line": 2, "character": 20},
+                  },
+                  "severity": 1,
+                  "code": "E001",
+                  "source": "lasm",
+                  "message": "Undefined variable 'testVar'",
+                  "tags": [1],
+                },
+                {
+                  "range": {
+                    "start": {"line": 5, "character": 0},
+                    "end": {"line": 5, "character": 5},
+                  },
+                  "severity": 2,
+                  "code": "W001",
+                  "source": "lasm",
+                  "message": "Function 'oldFunc' is deprecated",
+                  "tags": [2],
+                  "relatedInformation": [
+                    {
+                      "location": {
+                        "uri": "file:///related.py",
+                        "range": {
+                          "start": {"line": 10, "character": 0},
+                          "end": {"line": 10, "character": 10},
+                        },
+                      },
+                      "message": "New function available here",
+                    }
+                  ],
+                },
+              ],
+            },
+            "delays": {"hover": 0, "completion": 0, "diagnostics": 150},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "diagnostic_test"
+    check sm.scenarios.len == 1
+    check "diagnostic_test" in sm.scenarios
+
+    let scenario = sm.scenarios["diagnostic_test"]
+    check scenario.name == "Diagnostic Test Scenario"
+    check scenario.diagnostics.enabled == true
+    check scenario.diagnostics.diagnostics.len == 2
+    check scenario.delays.diagnostics == 150
+
+    # Check first diagnostic
+    let diag1 = scenario.diagnostics.diagnostics[0]
+    check diag1.message == "Undefined variable 'testVar'"
+    check diag1.severity == 1
+    check diag1.code.get == "E001"
+    check diag1.source.get == "lasm"
+    check diag1.tags.len == 1
+    check diag1.tags[0] == 1
+    check diag1.range.start.line == 2
+    check diag1.range.start.character == 10
+    check diag1.range.`end`.line == 2
+    check diag1.range.`end`.character == 20
+    check diag1.relatedInformation.len == 0
+
+    # Check second diagnostic
+    let diag2 = scenario.diagnostics.diagnostics[1]
+    check diag2.message == "Function 'oldFunc' is deprecated"
+    check diag2.severity == 2
+    check diag2.code.get == "W001"
+    check diag2.source.get == "lasm"
+    check diag2.tags.len == 1
+    check diag2.tags[0] == 2
+    check diag2.range.start.line == 5
+    check diag2.range.start.character == 0
+    check diag2.range.`end`.line == 5
+    check diag2.range.`end`.character == 5
+    check diag2.relatedInformation.len == 1
+    check diag2.relatedInformation[0].message == "New function available here"
+    check diag2.relatedInformation[0].location.uri == "file:///related.py"
+
+  test "loadConfigFile with disabled diagnostics":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_diagnostic_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_diagnostics",
+        "scenarios": {
+          "no_diagnostics": {
+            "name": "No Diagnostics Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false},
+            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_diagnostics"]
+    check scenario.diagnostics.enabled == false
+    check scenario.diagnostics.diagnostics.len == 0
+
+  test "loadConfigFile without diagnostic configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_diagnostic_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_diag_config",
+        "scenarios": {
+          "no_diag_config": {
+            "name": "No Diagnostic Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_diag_config"]
+    check scenario.diagnostics.enabled == false
+    check scenario.diagnostics.diagnostics.len == 0
+
+  test "loadConfigFile with minimal diagnostic configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_diagnostic_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_diag",
+        "scenarios": {
+          "minimal_diag": {
+            "name": "Minimal Diagnostic Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {
+              "enabled": true,
+              "diagnostics": [{"message": "Simple error", "severity": 1}],
+            },
+            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_diag"]
+    check scenario.diagnostics.enabled == true
+    check scenario.diagnostics.diagnostics.len == 1
+
+    let diag = scenario.diagnostics.diagnostics[0]
+    check diag.message == "Simple error"
+    check diag.severity == 1
+    # Should have default range (0,0) to (0,1)
+    check diag.range.start.line == 0
+    check diag.range.start.character == 0
+    check diag.range.`end`.line == 0
+    check diag.range.`end`.character == 1
+    # Optional fields should be none/empty
+    check diag.code.isNone
+    check diag.source.isNone
+    check diag.tags.len == 0
+    check diag.relatedInformation.len == 0

@@ -170,6 +170,80 @@ proc handleExecuteCommand*(
   else:
     raise newException(LSPError, "Unknown command: " & command)
 
+proc publishDiagnostics*(
+    handler: LSPHandler, uri: string
+): Future[seq[JsonNode]] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  var notifications: seq[JsonNode] = @[]
+
+  # Apply delay if configured
+  if scenario.delays.diagnostics > 0:
+    await sleepAsync(scenario.delays.diagnostics.milliseconds)
+
+  # Check if diagnostics are enabled
+  if not scenario.diagnostics.enabled:
+    # Clear diagnostics if disabled
+    let publishParams = PublishDiagnosticsParams()
+    publishParams.uri = uri
+    publishParams.diagnostics = some(newSeq[Diagnostic]())
+
+    let notification = newJObject()
+    notification["method"] = %"textDocument/publishDiagnostics"
+    notification["params"] = %publishParams
+    notifications.add(notification)
+    return notifications
+
+  # Check for error injection
+  if "diagnostics" in scenario.errors:
+    let error = scenario.errors["diagnostics"]
+    logError("Error injected for diagnostics: " & error.message)
+    # Don't publish diagnostics on error
+    return @[]
+
+  # Create diagnostics from scenario configuration
+  let publishParams = PublishDiagnosticsParams()
+  publishParams.uri = uri
+  var diagnostics: seq[Diagnostic] = @[]
+
+  for diagContent in scenario.diagnostics.diagnostics:
+    let diagnostic = Diagnostic()
+    diagnostic.range = diagContent.range
+    diagnostic.severity = some(diagContent.severity)
+    diagnostic.message = diagContent.message
+
+    if diagContent.code.isSome:
+      diagnostic.code = some(%diagContent.code.get)
+
+    if diagContent.source.isSome:
+      diagnostic.source = diagContent.source
+
+    if diagContent.relatedInformation.len > 0:
+      diagnostic.relatedInformation = some(diagContent.relatedInformation)
+
+    diagnostics.add(diagnostic)
+
+  publishParams.diagnostics = some(diagnostics)
+
+  let notification = newJObject()
+  notification["method"] = %"textDocument/publishDiagnostics"
+  notification["params"] = %publishParams
+
+  notifications.add(notification)
+
+  # Log diagnostic publishing
+  let logParams = LogMessageParams()
+  logParams.`type` = 5 # Log message
+  logParams.message =
+    fmt"Published {diagnostics.len} diagnostics for {uri.split('/')[^1]}"
+
+  let logNotification = newJObject()
+  logNotification["method"] = %"window/logMessage"
+  logNotification["params"] = %logParams
+  notifications.add(logNotification)
+
+  return notifications
+
 proc handleDidOpen*(
     handler: LSPHandler, params: JsonNode
 ): Future[seq[JsonNode]] {.async.} =
@@ -202,7 +276,13 @@ proc handleDidOpen*(
   notification["method"] = %"window/logMessage"
   notification["params"] = %logParams
 
-  return @[notification]
+  var notifications = @[notification]
+
+  # Publish diagnostics for the opened document
+  let diagnosticNotifications = await handler.publishDiagnostics(textDocItem.uri)
+  notifications.add(diagnosticNotifications)
+
+  return notifications
 
 proc handleDidChange*(
     handler: LSPHandler, params: JsonNode
@@ -271,7 +351,13 @@ proc handleDidChange*(
     notification["method"] = %"window/logMessage"
     notification["params"] = %logParams
 
-    return @[notification]
+    var notifications = @[notification]
+
+    # Publish diagnostics for the changed document
+    let diagnosticNotifications = await handler.publishDiagnostics(versionedTextDoc.uri)
+    notifications.add(diagnosticNotifications)
+
+    return notifications
   else:
     let fileName = versionedTextDoc.uri.split("/")[^1]
 
@@ -313,7 +399,19 @@ proc handleDidClose*(
     notification["method"] = %"window/logMessage"
     notification["params"] = %logParams
 
-    return @[notification]
+    var notifications = @[notification]
+
+    # Clear diagnostics for the closed document
+    let clearParams = PublishDiagnosticsParams()
+    clearParams.uri = textDocIdentifier.uri
+    clearParams.diagnostics = some(newSeq[Diagnostic]())
+
+    let clearNotification = newJObject()
+    clearNotification["method"] = %"textDocument/publishDiagnostics"
+    clearNotification["params"] = %clearParams
+    notifications.add(clearNotification)
+
+    return notifications
   else:
     let fileName = textDocIdentifier.uri.split("/")[^1]
 

@@ -30,9 +30,23 @@ type
     items*: seq[CompletionContent]
     isIncomplete*: bool
 
+  DiagnosticContent* = object
+    range*: Range
+    severity*: int # DiagnosticSeverity
+    code*: Option[string]
+    source*: Option[string]
+    message*: string
+    tags*: seq[int] # DiagnosticTag
+    relatedInformation*: seq[DiagnosticRelatedInformation]
+
+  DiagnosticConfig* = object
+    enabled*: bool
+    diagnostics*: seq[DiagnosticContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
+    diagnostics*: int
 
   ErrorConfig* = object
     code*: int
@@ -46,6 +60,7 @@ type
     name*: string
     hover*: HoverConfig
     completion*: CompletionConfig
+    diagnostics*: DiagnosticConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -188,16 +203,91 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.completion =
             CompletionConfig(enabled: false, isIncomplete: false, items: @[])
 
+        if scenarioData.hasKey("diagnostics"):
+          # Load diagnostics configuration
+          let diagnosticsNode = scenarioData["diagnostics"]
+          var d = DiagnosticConfig(enabled: diagnosticsNode["enabled"].getBool(false))
+          if d.enabled and diagnosticsNode.contains("diagnostics"):
+            d.diagnostics = @[]
+            for diagNode in diagnosticsNode["diagnostics"]:
+              var diag = DiagnosticContent(
+                message: diagNode["message"].getStr(""),
+                severity: diagNode{"severity"}.getInt(1), # Default to Error
+              )
+
+              # Parse range
+              if diagNode.contains("range"):
+                let rangeNode = diagNode["range"]
+                diag.range = Range(
+                  start: Position(
+                    line: rangeNode["start"]["line"].getInt(0),
+                    character: rangeNode["start"]["character"].getInt(0),
+                  ),
+                  `end`: Position(
+                    line: rangeNode["end"]["line"].getInt(0),
+                    character: rangeNode["end"]["character"].getInt(0),
+                  ),
+                )
+              else:
+                # Default to first character
+                diag.range = Range(
+                  start: Position(line: 0, character: 0),
+                  `end`: Position(line: 0, character: 1),
+                )
+
+              if diagNode.contains("code"):
+                diag.code = some(diagNode["code"].getStr())
+              if diagNode.contains("source"):
+                diag.source = some(diagNode["source"].getStr())
+              if diagNode.contains("tags"):
+                diag.tags = @[]
+                for tagNode in diagNode["tags"]:
+                  diag.tags.add(tagNode.getInt())
+              else:
+                diag.tags = @[]
+
+              if diagNode.contains("relatedInformation"):
+                diag.relatedInformation = @[]
+                for relInfoNode in diagNode["relatedInformation"]:
+                  var relInfo = DiagnosticRelatedInformation(
+                    message: relInfoNode["message"].getStr("")
+                  )
+                  if relInfoNode.contains("location"):
+                    let locNode = relInfoNode["location"]
+                    relInfo.location = Location(
+                      uri: locNode["uri"].getStr(""),
+                      range: Range(
+                        start: Position(
+                          line: locNode["range"]["start"]["line"].getInt(0),
+                          character: locNode["range"]["start"]["character"].getInt(0),
+                        ),
+                        `end`: Position(
+                          line: locNode["range"]["end"]["line"].getInt(0),
+                          character: locNode["range"]["end"]["character"].getInt(0),
+                        ),
+                      ),
+                    )
+                  diag.relatedInformation.add(relInfo)
+              else:
+                diag.relatedInformation = @[]
+
+              d.diagnostics.add(diag)
+          scenario.diagnostics = d
+        else:
+          # Default diagnostics config if not specified
+          scenario.diagnostics = DiagnosticConfig(enabled: false, diagnostics: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
           scenario.delays = DelayConfig(
             hover: delaysNode{"hover"}.getInt(0),
             completion: delaysNode{"completion"}.getInt(0),
+            diagnostics: delaysNode{"diagnostics"}.getInt(0),
           )
         else:
           # Default delay config if not specified
-          scenario.delays = DelayConfig(hover: 0, completion: 0)
+          scenario.delays = DelayConfig(hover: 0, completion: 0, diagnostics: 0)
 
         if scenarioData.hasKey("errors"):
           # Load error configuration
@@ -298,6 +388,32 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "detail": "class TestClass",
                 "documentation": "A test class for completion",
                 "insertText": "TestClass",
+              },
+            ],
+          },
+          "diagnostics": {
+            "enabled": true,
+            "diagnostics": [
+              {
+                "range": {
+                  "start": {"line": 2, "character": 10},
+                  "end": {"line": 2, "character": 20},
+                },
+                "severity": 1,
+                "code": "E001",
+                "source": "lasm",
+                "message": "Undefined variable 'testVar'",
+              },
+              {
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 5, "character": 5},
+                },
+                "severity": 2,
+                "code": "W001",
+                "source": "lasm",
+                "message": "Function 'oldFunc' is deprecated",
+                "tags": [2],
               },
             ],
           },
