@@ -668,7 +668,7 @@ type
     # selectionRangeProvider?: boolean | SelectionRangeOptions | SelectionRangeRegistrationOptions;
     # linkedEditingRangeProvider?: boolean | LinkedEditingRangeOptions | LinkedEditingRangeRegistrationOptions;
     # callHierarchyProvider?: boolean | CallHierarchyOptions | CallHierarchyRegistrationOptions;
-    # semanticTokensProvider?: SemanticTokensOptions | SemanticTokensRegistrationOptions;
+    semanticTokensProvider*: Option[SemanticTokensOptions]
     # monikerProvider?: boolean | MonikerOptions | MonikerRegistrationOptions;
     # typeHierarchyProvider?: boolean | TypeHierarchyOptions | TypeHierarchyRegistrationOptions;
     # inlineValueProvider?: boolean | InlineValueOptions | InlineValueRegistrationOptions;
@@ -1095,3 +1095,37 @@ type
 
   CancelTestResult* = object
     cancelled*: bool
+
+  # Semantic Tokens types
+  SemanticTokensParams* = ref object of RootObj
+    textDocument*: TextDocumentIdentifier
+
+  SemanticTokensDeltaParams* = ref object of RootObj
+    textDocument*: TextDocumentIdentifier
+    previousResultId*: string
+
+  SemanticTokensRangeParams* = ref object of RootObj
+    textDocument*: TextDocumentIdentifier
+    range*: Range
+
+  SemanticTokens* = ref object of RootObj
+    resultId*: Option[string]
+    data*: seq[uinteger]
+
+  SemanticTokensDelta* = ref object of RootObj
+    resultId*: Option[string]
+    edits*: seq[SemanticTokensEdit]
+
+  SemanticTokensEdit* = ref object of RootObj
+    start*: uinteger
+    deleteCount*: uinteger
+    data*: Option[seq[uinteger]]
+
+  SemanticTokensLegend* = ref object of RootObj
+    tokenTypes*: seq[string]
+    tokenModifiers*: seq[string]
+
+  SemanticTokensOptions* = ref object of RootObj
+    legend*: SemanticTokensLegend
+    range*: Option[bool]
+    full*: OptionalNode # boolean | { delta?: boolean; }

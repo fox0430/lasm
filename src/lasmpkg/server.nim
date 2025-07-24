@@ -125,6 +125,24 @@ proc handleCompletion(server: LSPServer, id: JsonNode, params: JsonNode) {.async
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleSemanticTokensFull(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleSemanticTokensFull(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
+proc handleSemanticTokensRange(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleSemanticTokensRange(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
   let params =
@@ -159,6 +177,10 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleHover(id, params)
   of "textDocument/completion":
     await server.handleCompletion(id, params)
+  of "textDocument/semanticTokens/full":
+    await server.handleSemanticTokensFull(id, params)
+  of "textDocument/semanticTokens/range":
+    await server.handleSemanticTokensRange(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

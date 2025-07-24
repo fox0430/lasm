@@ -43,10 +43,15 @@ type
     enabled*: bool
     diagnostics*: seq[DiagnosticContent]
 
+  SemanticTokensConfig* = object
+    enabled*: bool
+    tokens*: seq[uinteger]
+
   DelayConfig* = object
     hover*: int
     completion*: int
     diagnostics*: int
+    semanticTokens*: int
 
   ErrorConfig* = object
     code*: int
@@ -61,6 +66,7 @@ type
     hover*: HoverConfig
     completion*: CompletionConfig
     diagnostics*: DiagnosticConfig
+    semanticTokens*: SemanticTokensConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -277,6 +283,20 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default diagnostics config if not specified
           scenario.diagnostics = DiagnosticConfig(enabled: false, diagnostics: @[])
 
+        if scenarioData.hasKey("semanticTokens"):
+          # Load semantic tokens configuration
+          let semanticTokensNode = scenarioData["semanticTokens"]
+          var st =
+            SemanticTokensConfig(enabled: semanticTokensNode["enabled"].getBool(false))
+          if st.enabled and semanticTokensNode.contains("tokens"):
+            st.tokens = @[]
+            for tokenNode in semanticTokensNode["tokens"]:
+              st.tokens.add(uinteger(tokenNode.getInt()))
+          scenario.semanticTokens = st
+        else:
+          # Default semantic tokens config if not specified
+          scenario.semanticTokens = SemanticTokensConfig(enabled: false, tokens: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -284,10 +304,12 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             hover: delaysNode{"hover"}.getInt(0),
             completion: delaysNode{"completion"}.getInt(0),
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
+            semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
           )
         else:
           # Default delay config if not specified
-          scenario.delays = DelayConfig(hover: 0, completion: 0, diagnostics: 0)
+          scenario.delays =
+            DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0)
 
         if scenarioData.hasKey("errors"):
           # Load error configuration
@@ -417,7 +439,12 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
             ],
           },
-          "delays": {"completion": 100, "diagnostics": 200, "hover": 50},
+          "delays":
+            {"completion": 100, "diagnostics": 200, "hover": 50, "semanticTokens": 30},
+          "semanticTokens": {
+            "enabled": true,
+            "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+          },
         }
       },
     }

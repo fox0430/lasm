@@ -55,6 +55,28 @@ proc handleInitialize*(
   )
   serverCapabilities.executeCommandProvider = some(executeCommandOptions)
 
+  # Set semantic tokens provider
+  let semanticTokensLegend = SemanticTokensLegend()
+  semanticTokensLegend.tokenTypes =
+    @[
+      "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+      "parameter", "variable", "property", "enumMember", "event", "function", "method",
+      "macro", "keyword", "modifier", "comment", "string", "number", "regexp",
+      "operator", "decorator",
+    ]
+  semanticTokensLegend.tokenModifiers =
+    @[
+      "declaration", "definition", "readonly", "static", "deprecated", "abstract",
+      "async", "modification", "documentation", "defaultLibrary",
+    ]
+
+  let semanticTokensOptions = SemanticTokensOptions()
+  semanticTokensOptions.legend = semanticTokensLegend
+  semanticTokensOptions.range = some(true)
+  semanticTokensOptions.full = some(%*{"delta": false})
+
+  serverCapabilities.semanticTokensProvider = some(semanticTokensOptions)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -556,3 +578,93 @@ proc handleDidChangeConfiguration*(
   )
 
   return notifications
+
+proc handleSemanticTokensFull*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.semanticTokens > 0:
+    await sleepAsync(scenario.delays.semanticTokens.milliseconds)
+
+  # Check if semantic tokens are enabled
+  if not scenario.semanticTokens.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "semanticTokens" in scenario.errors:
+    let error = scenario.errors["semanticTokens"]
+    raise newException(LSPError, error.message)
+
+  # Extract text document URI
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create semantic tokens from scenario configuration
+    let semanticTokens = SemanticTokens()
+    semanticTokens.resultId = some("result-" & $handler.documents.len)
+
+    # Use configured tokens from scenario or generate sample tokens
+    if scenario.semanticTokens.tokens.len > 0:
+      semanticTokens.data = scenario.semanticTokens.tokens
+    else:
+      # Generate sample semantic tokens for demonstration
+      # Format: [deltaLine, deltaStart, length, tokenType, tokenModifiers]
+      semanticTokens.data =
+        @[
+          uinteger(0),
+          uinteger(0),
+          uinteger(8),
+          uinteger(14),
+          uinteger(0), # "function" keyword
+          uinteger(0),
+          uinteger(9),
+          uinteger(4),
+          uinteger(12),
+          uinteger(1), # function name
+          uinteger(1),
+          uinteger(2),
+          uinteger(3),
+          uinteger(6),
+          uinteger(0), # variable "var"
+          uinteger(0),
+          uinteger(4),
+          uinteger(4),
+          uinteger(15),
+          uinteger(0), # type keyword
+        ]
+
+    return %semanticTokens
+  else:
+    # Document not found, return empty tokens
+    let semanticTokens = SemanticTokens()
+    semanticTokens.resultId = some("empty")
+    semanticTokens.data = @[]
+    return %semanticTokens
+
+proc handleSemanticTokensRange*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.semanticTokens > 0:
+    await sleepAsync(scenario.delays.semanticTokens.milliseconds)
+
+  # Check if semantic tokens are enabled
+  if not scenario.semanticTokens.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "semanticTokens" in scenario.errors:
+    let error = scenario.errors["semanticTokens"]
+    raise newException(LSPError, error.message)
+
+  # For simplicity, return the same as full semantic tokens
+  # In a real implementation, this would filter tokens by range
+  return await handler.handleSemanticTokensFull(id, params)
