@@ -1,4 +1,4 @@
-import std/[unittest, json, tables, options, times, strutils]
+import std/[unittest, json, tables, options, times, strutils, sequtils]
 
 import pkg/chronos
 
@@ -17,7 +17,8 @@ proc createTestScenarioManager(): ScenarioManager =
     hover: HoverConfig(enabled: true, content: none(HoverContent), contents: @[]),
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
     diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+    semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -47,7 +48,28 @@ proc createTestScenarioManager(): ScenarioManager =
         ],
     ),
     diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-    delays: DelayConfig(hover: 50, completion: 30, diagnostics: 0),
+    semanticTokens: SemanticTokensConfig(
+      enabled: true,
+      tokens:
+        @[
+          uinteger(0),
+          uinteger(0),
+          uinteger(8),
+          uinteger(14),
+          uinteger(0), # function keyword  
+          uinteger(0),
+          uinteger(9),
+          uinteger(4),
+          uinteger(12),
+          uinteger(1), # function name
+          uinteger(1),
+          uinteger(2),
+          uinteger(3),
+          uinteger(6),
+          uinteger(0), # variable
+        ],
+    ),
+    delays: DelayConfig(hover: 50, completion: 30, diagnostics: 0, semanticTokens: 25),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -57,11 +79,13 @@ proc createTestScenarioManager(): ScenarioManager =
     hover: HoverConfig(enabled: true),
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
     diagnostics: DiagnosticConfig(enabled: true, diagnostics: @[]),
-    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+    semanticTokens: SemanticTokensConfig(enabled: true, tokens: @[]),
+    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
       "completion": ErrorConfig(code: -32602, message: "Completion error"),
       "diagnostics": ErrorConfig(code: -32603, message: "Diagnostic error"),
+      "semanticTokens": ErrorConfig(code: -32603, message: "Semantic tokens error"),
     }.toTable,
   )
 
@@ -95,6 +119,7 @@ suite "lsp_handler module tests":
     check capabilities.hasKey("hoverProvider")
     check capabilities.hasKey("executeCommandProvider")
     check capabilities.hasKey("diagnosticProvider")
+    check capabilities.hasKey("semanticTokensProvider")
 
     check capabilities["hoverProvider"].getBool() == true
 
@@ -336,7 +361,8 @@ suite "lsp_handler module tests":
       hover: HoverConfig(enabled: false),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -434,7 +460,8 @@ suite "lsp_handler module tests":
       hover: HoverConfig(enabled: true),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -503,7 +530,8 @@ suite "lsp_handler module tests":
           ],
       ),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "incomplete"
@@ -683,6 +711,221 @@ suite "lsp_handler module tests":
     check closeNotifications[0]["params"]["message"].getStr().contains(
       "Warning: Attempted to close unopened document"
     )
+
+  test "handleSemanticTokensFull with enabled semantic tokens":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has semantic tokens configured
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "function test() {}", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleSemanticTokensFull(%1, params)
+
+    check response.hasKey("resultId")
+    check response.hasKey("data")
+    check response["resultId"].getStr().startsWith("result-")
+
+    let data = response["data"]
+    check data.kind == JArray
+    check data.len == 15 # 3 tokens * 5 values each
+
+    # Check first token (function keyword)
+    check data[0].getInt() == 0 # deltaLine
+    check data[1].getInt() == 0 # deltaStart
+    check data[2].getInt() == 8 # length
+    check data[3].getInt() == 14 # tokenType (keyword)
+    check data[4].getInt() == 0 # tokenModifiers
+
+  test "handleSemanticTokensFull with disabled semantic tokens":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has semantic tokens disabled
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleSemanticTokensFull(%1, params)
+
+    check response.kind == JNull
+
+  test "handleSemanticTokensFull with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    expect LSPError:
+      discard waitFor handler.handleSemanticTokensFull(%1, params)
+
+  test "handleSemanticTokensFull with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 25ms delay for semantic tokens
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "function test() {}", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleSemanticTokensFull(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 20ms due to 25ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 20
+
+    check response.hasKey("data")
+
+  test "handleSemanticTokensFull with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///nonexistent.nim"}}
+
+    let response = waitFor handler.handleSemanticTokensFull(%1, params)
+
+    check response.hasKey("resultId")
+    check response.hasKey("data")
+    check response["resultId"].getStr() == "empty"
+    check response["data"].len == 0
+
+  test "handleSemanticTokensFull with default token generation":
+    let sm = createTestScenarioManager()
+    # Create scenario with semantic tokens enabled but no custom tokens
+    sm.scenarios["no_tokens"] = Scenario(
+      name: "No Custom Tokens",
+      hover: HoverConfig(enabled: true),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: true, tokens: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "no_tokens"
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "function test() {}", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleSemanticTokensFull(%1, params)
+
+    check response.hasKey("data")
+    let data = response["data"]
+    check data.len == 20 # Default sample has 4 tokens * 5 values each
+
+  test "handleSemanticTokensRange with enabled semantic tokens":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "function test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
+      }
+
+    let response = waitFor handler.handleSemanticTokensRange(%1, params)
+
+    check response.hasKey("resultId")
+    check response.hasKey("data")
+
+    let data = response["data"]
+    check data.kind == JArray
+    check data.len == 15 # Same as full for this simple implementation
+
+  test "handleSemanticTokensRange with disabled semantic tokens":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has semantic tokens disabled
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}},
+      }
+
+    let response = waitFor handler.handleSemanticTokensRange(%1, params)
+
+    check response.kind == JNull
+
+  test "handleSemanticTokensRange with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 25ms delay for semantic tokens
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "function test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleSemanticTokensRange(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 20ms due to 25ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 20
+
+    check response.hasKey("data")
+
+  test "semantic tokens capability in initialization":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"processId": 1234, "capabilities": {}}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    let capabilities = response["capabilities"]
+    check capabilities.hasKey("semanticTokensProvider")
+
+    let semanticTokensProvider = capabilities["semanticTokensProvider"]
+    check semanticTokensProvider.hasKey("legend")
+    check semanticTokensProvider.hasKey("range")
+    check semanticTokensProvider.hasKey("full")
+
+    let legend = semanticTokensProvider["legend"]
+    check legend.hasKey("tokenTypes")
+    check legend.hasKey("tokenModifiers")
+
+    let tokenTypes = legend["tokenTypes"]
+    check tokenTypes.kind == JArray
+    check tokenTypes.len == 23 # All standard token types
+    check "namespace" in tokenTypes.mapIt(it.getStr())
+    check "function" in tokenTypes.mapIt(it.getStr())
+    check "keyword" in tokenTypes.mapIt(it.getStr())
+
+    let tokenModifiers = legend["tokenModifiers"]
+    check tokenModifiers.kind == JArray
+    check tokenModifiers.len == 10 # All standard token modifiers
+    check "declaration" in tokenModifiers.mapIt(it.getStr())
+    check "definition" in tokenModifiers.mapIt(it.getStr())
+    check "readonly" in tokenModifiers.mapIt(it.getStr())
+
+    check semanticTokensProvider["range"].getBool() == true
+    check semanticTokensProvider["full"].hasKey("delta")
+    check semanticTokensProvider["full"]["delta"].getBool() == false
 
   test "handleDidChangeConfiguration with no settings":
     let sm = createTestScenarioManager()

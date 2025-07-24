@@ -34,7 +34,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: true),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -65,7 +66,8 @@ suite "scenario module tests":
               "content": {"kind": "markdown", "message": "Test hover message"},
             },
             "completion": {"enabled": false, "items": []},
-            "delays": {"hover": 50, "completion": 0, "diagnostics": 0},
+            "delays":
+              {"hover": 50, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
             "errors": {"hover": {"code": -32603, "message": "Test error"}},
           }
         },
@@ -113,7 +115,8 @@ suite "scenario module tests":
               ],
             },
             "completion": {"enabled": false, "items": []},
-            "delays": {"hover": 25, "completion": 0, "diagnostics": 0},
+            "delays":
+              {"hover": 25, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
           }
         },
       }
@@ -154,7 +157,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: false),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -171,7 +175,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: true),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -188,7 +193,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: true),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -214,7 +220,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: true),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 50, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 50, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -223,7 +230,8 @@ suite "scenario module tests":
       hover: HoverConfig(enabled: false),
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
-      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      delays: DelayConfig(hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0),
       errors: initTable[string, ErrorConfig](),
     )
 
@@ -292,11 +300,24 @@ suite "scenario module tests":
     check errorConfig.message == "Invalid params"
 
   test "DelayConfig initialization":
-    let delayConfig = DelayConfig(hover: 150, completion: 100, diagnostics: 200)
+    let delayConfig =
+      DelayConfig(hover: 150, completion: 100, diagnostics: 200, semanticTokens: 75)
 
     check delayConfig.hover == 150
     check delayConfig.completion == 100
     check delayConfig.diagnostics == 200
+    check delayConfig.semanticTokens == 75
+
+  test "SemanticTokensConfig initialization":
+    let semanticTokensConfig = SemanticTokensConfig(
+      enabled: true,
+      tokens: @[uinteger(0), uinteger(0), uinteger(8), uinteger(14), uinteger(0)],
+    )
+
+    check semanticTokensConfig.enabled == true
+    check semanticTokensConfig.tokens.len == 5
+    check semanticTokensConfig.tokens[0] == 0
+    check semanticTokensConfig.tokens[3] == 14
 
   test "loadConfigFile with empty scenarios":
     let tempDir = getTempDir()
@@ -410,7 +431,8 @@ suite "scenario module tests":
                 },
               ],
             },
-            "delays": {"hover": 0, "completion": 0, "diagnostics": 150},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 150, "semanticTokens": 0},
           }
         },
       }
@@ -475,7 +497,8 @@ suite "scenario module tests":
             "hover": {"enabled": false},
             "completion": {"enabled": false, "items": []},
             "diagnostics": {"enabled": false},
-            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
           }
         },
       }
@@ -504,7 +527,8 @@ suite "scenario module tests":
             "name": "No Diagnostic Config Scenario",
             "hover": {"enabled": false},
             "completion": {"enabled": false, "items": []},
-            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
           }
         },
       }
@@ -537,7 +561,8 @@ suite "scenario module tests":
               "enabled": true,
               "diagnostics": [{"message": "Simple error", "severity": 1}],
             },
-            "delays": {"hover": 0, "completion": 0, "diagnostics": 0},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
           }
         },
       }
@@ -567,3 +592,113 @@ suite "scenario module tests":
     check diag.source.isNone
     check diag.tags.len == 0
     check diag.relatedInformation.len == 0
+
+  test "loadConfigFile with semantic tokens configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_semantic_tokens_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "semantic_tokens_test",
+        "scenarios": {
+          "semantic_tokens_test": {
+            "name": "Semantic Tokens Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {
+              "enabled": true,
+              "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+            },
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 50},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "semantic_tokens_test"
+    check sm.scenarios.len == 1
+    check "semantic_tokens_test" in sm.scenarios
+
+    let scenario = sm.scenarios["semantic_tokens_test"]
+    check scenario.name == "Semantic Tokens Test Scenario"
+    check scenario.semanticTokens.enabled == true
+    check scenario.semanticTokens.tokens.len == 20 # 4 tokens * 5 values each
+    check scenario.delays.semanticTokens == 50
+
+    # Check token values
+    check scenario.semanticTokens.tokens[0] == 0 # deltaLine
+    check scenario.semanticTokens.tokens[1] == 0 # deltaStart  
+    check scenario.semanticTokens.tokens[2] == 8 # length
+    check scenario.semanticTokens.tokens[3] == 14 # tokenType
+    check scenario.semanticTokens.tokens[4] == 0 # tokenModifiers
+
+  test "loadConfigFile with disabled semantic tokens":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_semantic_tokens_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_semantic_tokens",
+        "scenarios": {
+          "no_semantic_tokens": {
+            "name": "No Semantic Tokens Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_semantic_tokens"]
+    check scenario.semanticTokens.enabled == false
+    check scenario.semanticTokens.tokens.len == 0
+
+  test "loadConfigFile without semantic tokens configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_semantic_tokens_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_semantic_config",
+        "scenarios": {
+          "no_semantic_config": {
+            "name": "No Semantic Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "delays":
+              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_semantic_config"]
+    check scenario.semanticTokens.enabled == false
+    check scenario.semanticTokens.tokens.len == 0
