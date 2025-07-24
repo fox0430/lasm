@@ -81,6 +81,9 @@ proc handleInitialize*(
   let inlayHintOptions = InlayHintOptions(resolveProvider: some(false))
   serverCapabilities.inlayHintProvider = some(inlayHintOptions)
 
+  # Set declaration provider
+  serverCapabilities.declarationProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -729,3 +732,53 @@ proc handleInlayHint*(
   else:
     # Document not found, return empty hints
     return %(@[])
+
+proc handleDeclaration*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.declaration > 0:
+    await sleepAsync(scenario.delays.declaration.milliseconds)
+
+  # Check if declaration is enabled
+  if not scenario.declaration.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "declaration" in scenario.errors:
+    let error = scenario.errors["declaration"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create declaration response from scenario configuration
+    if scenario.declaration.locations.len > 0:
+      # Return array of locations
+      var locations: seq[JsonNode] = @[]
+      for loc in scenario.declaration.locations:
+        let location = Location()
+        location.uri = loc.uri
+        location.range = loc.range
+        locations.add(%location)
+      return %locations
+    elif scenario.declaration.location.uri != "":
+      # Return single location
+      let location = Location()
+      location.uri = scenario.declaration.location.uri
+      location.range = scenario.declaration.location.range
+      return %location
+    else:
+      # No declaration found
+      return newJNull()
+  else:
+    # Document not found
+    return newJNull()
