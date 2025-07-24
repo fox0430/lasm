@@ -18,7 +18,10 @@ proc createTestScenarioManager(): ScenarioManager =
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
     diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
     semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+    inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+    delays: DelayConfig(
+      hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+    ),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -69,7 +72,33 @@ proc createTestScenarioManager(): ScenarioManager =
           uinteger(0), # variable
         ],
     ),
-    delays: DelayConfig(hover: 50, completion: 30, diagnostics: 0, semanticTokens: 25),
+    inlayHint: InlayHintConfig(
+      enabled: true,
+      hints:
+        @[
+          InlayHintContent(
+            position: Position(line: 1, character: 15),
+            label: ": string",
+            kind: some(1),
+            tooltip: some("Parameter type hint"),
+            paddingLeft: some(false),
+            paddingRight: some(false),
+            textEdits: @[],
+          ),
+          InlayHintContent(
+            position: Position(line: 5, character: 20),
+            label: " -> bool",
+            kind: some(1),
+            tooltip: some("Return type hint"),
+            paddingLeft: some(true),
+            paddingRight: some(false),
+            textEdits: @[],
+          ),
+        ],
+    ),
+    delays: DelayConfig(
+      hover: 50, completion: 30, diagnostics: 0, semanticTokens: 25, inlayHint: 40
+    ),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -80,12 +109,16 @@ proc createTestScenarioManager(): ScenarioManager =
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
     diagnostics: DiagnosticConfig(enabled: true, diagnostics: @[]),
     semanticTokens: SemanticTokensConfig(enabled: true, tokens: @[]),
-    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+    inlayHint: InlayHintConfig(enabled: true, hints: @[]),
+    delays: DelayConfig(
+      hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+    ),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
       "completion": ErrorConfig(code: -32602, message: "Completion error"),
       "diagnostics": ErrorConfig(code: -32603, message: "Diagnostic error"),
       "semanticTokens": ErrorConfig(code: -32603, message: "Semantic tokens error"),
+      "inlayHint": ErrorConfig(code: -32603, message: "Inlay hint error"),
     }.toTable,
   )
 
@@ -120,6 +153,7 @@ suite "lsp_handler module tests":
     check capabilities.hasKey("executeCommandProvider")
     check capabilities.hasKey("diagnosticProvider")
     check capabilities.hasKey("semanticTokensProvider")
+    check capabilities.hasKey("inlayHintProvider")
 
     check capabilities["hoverProvider"].getBool() == true
 
@@ -362,7 +396,10 @@ suite "lsp_handler module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      delays: DelayConfig(
+        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -461,7 +498,10 @@ suite "lsp_handler module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      delays: DelayConfig(
+        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -531,7 +571,10 @@ suite "lsp_handler module tests":
       ),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      delays: DelayConfig(
+        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+      ),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "incomplete"
@@ -954,3 +997,134 @@ suite "lsp_handler module tests":
     check notifications[0]["params"]["message"].getStr() ==
       "Received workspace/didChangeConfiguration notification"
     check sm.currentScenario == "default" # Should remain unchanged
+
+  test "handleInlayHint with enabled inlay hints":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has inlay hints configured
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test(param) -> bool", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+      }
+
+    let response = waitFor handler.handleInlayHint(%1, params)
+
+    check response.kind == JArray
+    check response.len == 2
+
+    # Check first hint (parameter type)
+    let hint1 = response[0]
+    check hint1["position"]["line"].getInt() == 1
+    check hint1["position"]["character"].getInt() == 15
+    check hint1["label"].getStr() == ": string"
+    check hint1["kind"].getInt() == 1
+    check hint1["tooltip"].getStr() == "Parameter type hint"
+    check hint1["paddingLeft"].getBool() == false
+    check hint1["paddingRight"].getBool() == false
+
+    # Check second hint (return type)
+    let hint2 = response[1]
+    check hint2["position"]["line"].getInt() == 5
+    check hint2["position"]["character"].getInt() == 20
+    check hint2["label"].getStr() == " -> bool"
+    check hint2["kind"].getInt() == 1
+    check hint2["tooltip"].getStr() == "Return type hint"
+    check hint2["paddingLeft"].getBool() == true
+    check hint2["paddingRight"].getBool() == false
+
+  test "handleInlayHint with disabled inlay hints":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has inlay hints disabled
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+      }
+
+    let response = waitFor handler.handleInlayHint(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleInlayHint with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+      }
+
+    expect LSPError:
+      discard waitFor handler.handleInlayHint(%1, params)
+
+  test "handleInlayHint with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 40ms delay for inlay hints
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test(param) -> bool", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleInlayHint(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 30ms due to 40ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 30
+
+    check response.kind == JArray
+    check response.len == 2
+
+  test "handleInlayHint with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim"},
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+      }
+
+    let response = waitFor handler.handleInlayHint(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0
+
+  test "inlay hint capability in initialization":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"processId": 1234, "capabilities": {}}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    let capabilities = response["capabilities"]
+    check capabilities.hasKey("inlayHintProvider")
+
+    let inlayHintProvider = capabilities["inlayHintProvider"]
+    check inlayHintProvider.hasKey("resolveProvider")
+    check inlayHintProvider["resolveProvider"].getBool() == false

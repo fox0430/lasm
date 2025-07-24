@@ -47,6 +47,8 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/didClose | |
 | textDocument/hover | |
 | textDocument/completion | |
+| textDocument/publishDiagnostics | |
+| textDocument/inlayHint | |
 | textDocument/shutdown | |
 
 ## Commands
