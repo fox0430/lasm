@@ -16,7 +16,8 @@ proc createTestScenarioManager(): ScenarioManager =
     name: "Default Test",
     hover: HoverConfig(enabled: true, content: none(HoverContent), contents: @[]),
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
-    delays: DelayConfig(hover: 0, completion: 0),
+    diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -45,7 +46,8 @@ proc createTestScenarioManager(): ScenarioManager =
           ),
         ],
     ),
-    delays: DelayConfig(hover: 50, completion: 30),
+    diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+    delays: DelayConfig(hover: 50, completion: 30, diagnostics: 0),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -54,10 +56,12 @@ proc createTestScenarioManager(): ScenarioManager =
     name: "Error Test",
     hover: HoverConfig(enabled: true),
     completion: CompletionConfig(enabled: true, isIncomplete: false, items: @[]),
-    delays: DelayConfig(hover: 0, completion: 0),
+    diagnostics: DiagnosticConfig(enabled: true, diagnostics: @[]),
+    delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
       "completion": ErrorConfig(code: -32602, message: "Completion error"),
+      "diagnostics": ErrorConfig(code: -32603, message: "Diagnostic error"),
     }.toTable,
   )
 
@@ -207,7 +211,9 @@ suite "lsp_handler module tests":
     check doc.content == "echo \"hello\""
     check doc.version == 1
 
-    check notifications.len == 1
+    # Should have: log message + publishDiagnostics (if enabled) + diagnostic log (if enabled)
+    check notifications.len >= 1
+    # First notification should be the log message
     check notifications[0]["method"].getStr() == "window/logMessage"
 
   test "handleDidChange updates document":
@@ -230,7 +236,9 @@ suite "lsp_handler module tests":
     check doc.content == "new content"
     check doc.version == 2
 
-    check notifications.len == 1
+    # Should have: log message + publishDiagnostics (if enabled) + diagnostic log (if enabled)
+    check notifications.len >= 1
+    # First notification should be the log message
     check notifications[0]["method"].getStr() == "window/logMessage"
 
   test "handleDidChange with range-based change":
@@ -289,8 +297,15 @@ suite "lsp_handler module tests":
     check handler.documents.len == 0
     check "file:///test.nim" notin handler.documents
 
-    check notifications.len == 1
-    check notifications[0]["method"].getStr() == "window/logMessage"
+    # Should have: log message + clear diagnostics notification
+    check notifications.len >= 1
+    # Should contain at least a log message
+    var hasLogMessage = false
+    for notif in notifications:
+      if notif["method"].getStr() == "window/logMessage":
+        hasLogMessage = true
+        break
+    check hasLogMessage
 
   test "handleHover with enabled hover":
     let sm = createTestScenarioManager()
@@ -319,7 +334,9 @@ suite "lsp_handler module tests":
     sm.scenarios["disabled"] = Scenario(
       name: "Disabled Hover",
       hover: HoverConfig(enabled: false),
-      delays: DelayConfig(hover: 0),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -415,8 +432,9 @@ suite "lsp_handler module tests":
     sm.scenarios["disabled"] = Scenario(
       name: "Disabled Completion",
       hover: HoverConfig(enabled: true),
-      completion: CompletionConfig(enabled: false),
-      delays: DelayConfig(hover: 0, completion: 0),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "disabled"
@@ -484,7 +502,8 @@ suite "lsp_handler module tests":
             )
           ],
       ),
-      delays: DelayConfig(hover: 0, completion: 0),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "incomplete"
