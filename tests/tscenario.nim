@@ -36,7 +36,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 100,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -161,7 +166,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -181,7 +191,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 100,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -201,7 +216,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 100,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -230,7 +250,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 50, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 50,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -242,7 +267,12 @@ suite "scenario module tests":
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       delays: DelayConfig(
-        hover: 100, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 100,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -313,7 +343,12 @@ suite "scenario module tests":
 
   test "DelayConfig initialization":
     let delayConfig = DelayConfig(
-      hover: 150, completion: 100, diagnostics: 200, semanticTokens: 75, inlayHint: 50
+      hover: 150,
+      completion: 100,
+      diagnostics: 200,
+      semanticTokens: 75,
+      inlayHint: 50,
+      declaration: 80,
     )
 
     check delayConfig.hover == 150
@@ -321,6 +356,7 @@ suite "scenario module tests":
     check delayConfig.diagnostics == 200
     check delayConfig.semanticTokens == 75
     check delayConfig.inlayHint == 50
+    check delayConfig.declaration == 80
 
   test "SemanticTokensConfig initialization":
     let semanticTokensConfig = SemanticTokensConfig(
@@ -977,3 +1013,252 @@ suite "scenario module tests":
     check hint.paddingLeft.isNone
     check hint.paddingRight.isNone
     check hint.textEdits.len == 0
+
+  test "DeclarationConfig initialization":
+    let declarationContent = DeclarationContent(
+      uri: "file:///test_declaration.nim",
+      range: Range(
+        start: Position(line: 5, character: 10), `end`: Position(line: 5, character: 20)
+      ),
+    )
+
+    let declarationConfig = DeclarationConfig(
+      enabled: true, location: declarationContent, locations: @[declarationContent]
+    )
+
+    check declarationConfig.enabled == true
+    check declarationConfig.location.uri == "file:///test_declaration.nim"
+    check declarationConfig.location.range.start.line == 5
+    check declarationConfig.location.range.start.character == 10
+    check declarationConfig.location.range.`end`.line == 5
+    check declarationConfig.location.range.`end`.character == 20
+    check declarationConfig.locations.len == 1
+    check declarationConfig.locations[0].uri == "file:///test_declaration.nim"
+
+  test "loadConfigFile with declaration configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_declaration_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "declaration_test",
+        "scenarios": {
+          "declaration_test": {
+            "name": "Declaration Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///single_declaration.nim",
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+              },
+              "locations": [
+                {
+                  "uri": "file:///multi_declaration1.nim",
+                  "range": {
+                    "start": {"line": 3, "character": 0},
+                    "end": {"line": 3, "character": 10},
+                  },
+                },
+                {
+                  "uri": "file:///multi_declaration2.nim",
+                  "range": {
+                    "start": {"line": 7, "character": 5},
+                    "end": {"line": 7, "character": 15},
+                  },
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 100,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "declaration_test"
+    check sm.scenarios.len == 1
+    check "declaration_test" in sm.scenarios
+
+    let scenario = sm.scenarios["declaration_test"]
+    check scenario.name == "Declaration Test Scenario"
+    check scenario.declaration.enabled == true
+    check scenario.delays.declaration == 100
+
+    # Check single location
+    check scenario.declaration.location.uri == "file:///single_declaration.nim"
+    check scenario.declaration.location.range.start.line == 10
+    check scenario.declaration.location.range.start.character == 5
+    check scenario.declaration.location.range.`end`.line == 10
+    check scenario.declaration.location.range.`end`.character == 15
+
+    # Check multiple locations
+    check scenario.declaration.locations.len == 2
+    let loc1 = scenario.declaration.locations[0]
+    check loc1.uri == "file:///multi_declaration1.nim"
+    check loc1.range.start.line == 3
+    check loc1.range.start.character == 0
+    check loc1.range.`end`.line == 3
+    check loc1.range.`end`.character == 10
+
+    let loc2 = scenario.declaration.locations[1]
+    check loc2.uri == "file:///multi_declaration2.nim"
+    check loc2.range.start.line == 7
+    check loc2.range.start.character == 5
+    check loc2.range.`end`.line == 7
+    check loc2.range.`end`.character == 15
+
+  test "loadConfigFile with disabled declaration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_declaration_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_declaration",
+        "scenarios": {
+          "no_declaration": {
+            "name": "No Declaration Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_declaration"]
+    check scenario.declaration.enabled == false
+    check scenario.declaration.location.uri == ""
+    check scenario.declaration.locations.len == 0
+
+  test "loadConfigFile without declaration configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_declaration_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_decl_config",
+        "scenarios": {
+          "no_decl_config": {
+            "name": "No Declaration Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_decl_config"]
+    check scenario.declaration.enabled == false
+    check scenario.declaration.location.uri == ""
+    check scenario.declaration.locations.len == 0
+
+  test "loadConfigFile with minimal declaration configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_declaration_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_decl",
+        "scenarios": {
+          "minimal_decl": {
+            "name": "Minimal Declaration Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///minimal.nim",
+                "range": {
+                  "start": {"line": 0, "character": 0},
+                  "end": {"line": 0, "character": 10},
+                },
+              },
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_decl"]
+    check scenario.declaration.enabled == true
+    check scenario.declaration.location.uri == "file:///minimal.nim"
+    check scenario.declaration.location.range.start.line == 0
+    check scenario.declaration.location.range.start.character == 0
+    check scenario.declaration.location.range.`end`.line == 0
+    check scenario.declaration.location.range.`end`.character == 10
+    # locations should be empty since not specified
+    check scenario.declaration.locations.len == 0

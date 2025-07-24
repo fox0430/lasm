@@ -49,6 +49,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/completion | |
 | textDocument/publishDiagnostics | |
 | textDocument/inlayHint | |
+| textDocument/declaration | |
 | textDocument/shutdown | |
 
 ## Commands

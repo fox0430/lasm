@@ -60,12 +60,22 @@ type
     enabled*: bool
     hints*: seq[InlayHintContent]
 
+  DeclarationContent* = object
+    uri*: string
+    range*: Range
+
+  DeclarationConfig* = object
+    enabled*: bool
+    location*: DeclarationContent
+    locations*: seq[DeclarationContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
     diagnostics*: int
     semanticTokens*: int
     inlayHint*: int
+    declaration*: int
 
   ErrorConfig* = object
     code*: int
@@ -82,6 +92,7 @@ type
     diagnostics*: DiagnosticConfig
     semanticTokens*: SemanticTokensConfig
     inlayHint*: InlayHintConfig
+    declaration*: DeclarationConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -364,6 +375,64 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default inlay hint config if not specified
           scenario.inlayHint = InlayHintConfig(enabled: false, hints: @[])
 
+        if scenarioData.hasKey("declaration"):
+          # Load declaration configuration
+          let declarationNode = scenarioData["declaration"]
+          var dc = DeclarationConfig(enabled: declarationNode["enabled"].getBool(false))
+          if dc.enabled:
+            # Handle single location
+            if declarationNode.contains("location"):
+              let locNode = declarationNode["location"]
+              dc.location = DeclarationContent(
+                uri: locNode["uri"].getStr(""),
+                range: Range(
+                  start: Position(
+                    line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                    character:
+                      uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                  ),
+                  `end`: Position(
+                    line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                    character: uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                  ),
+                ),
+              )
+
+            # Handle multiple locations
+            if declarationNode.contains("locations"):
+              dc.locations = @[]
+              for locNode in declarationNode["locations"]:
+                let declContent = DeclarationContent(
+                  uri: locNode["uri"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                dc.locations.add(declContent)
+          scenario.declaration = dc
+        else:
+          # Default declaration config if not specified
+          scenario.declaration = DeclarationConfig(
+            enabled: false,
+            location: DeclarationContent(
+              uri: "",
+              range: Range(
+                start: Position(line: 0, character: 0),
+                `end`: Position(line: 0, character: 0),
+              ),
+            ),
+            locations: @[],
+          )
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -373,11 +442,17 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
+            declaration: delaysNode{"declaration"}.getInt(0),
           )
         else:
           # Default delay config if not specified
           scenario.delays = DelayConfig(
-            hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+            hover: 0,
+            completion: 0,
+            diagnostics: 0,
+            semanticTokens: 0,
+            inlayHint: 0,
+            declaration: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -535,10 +610,21 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "hover": 50,
             "semanticTokens": 30,
             "inlayHint": 25,
+            "declaration": 40,
           },
           "semanticTokens": {
             "enabled": true,
             "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+          },
+          "declaration": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///path/to/declaration.nim",
+              "range": {
+                "start": {"line": 10, "character": 5},
+                "end": {"line": 10, "character": 15},
+              },
+            },
           },
         }
       },
