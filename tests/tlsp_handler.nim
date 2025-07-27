@@ -29,6 +29,16 @@ proc createTestScenarioManager(): ScenarioManager =
       ),
       locations: @[],
     ),
+    definition: DefinitionConfig(
+      enabled: false,
+      location: DefinitionContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
+    ),
     delays: DelayConfig(
       hover: 0,
       completion: 0,
@@ -36,6 +46,7 @@ proc createTestScenarioManager(): ScenarioManager =
       semanticTokens: 0,
       inlayHint: 0,
       declaration: 0,
+      definition: 0,
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -138,6 +149,33 @@ proc createTestScenarioManager(): ScenarioManager =
           ),
         ],
     ),
+    definition: DefinitionConfig(
+      enabled: true,
+      location: DefinitionContent(
+        uri: "file:///test_definition.nim",
+        range: Range(
+          start: Position(line: 15, character: 2),
+          `end`: Position(line: 15, character: 12),
+        ),
+      ),
+      locations:
+        @[
+          DefinitionContent(
+            uri: "file:///implementation1.nim",
+            range: Range(
+              start: Position(line: 10, character: 4),
+              `end`: Position(line: 10, character: 14),
+            ),
+          ),
+          DefinitionContent(
+            uri: "file:///implementation2.nim",
+            range: Range(
+              start: Position(line: 20, character: 8),
+              `end`: Position(line: 20, character: 18),
+            ),
+          ),
+        ],
+    ),
     delays: DelayConfig(
       hover: 50,
       completion: 30,
@@ -145,6 +183,7 @@ proc createTestScenarioManager(): ScenarioManager =
       semanticTokens: 25,
       inlayHint: 40,
       declaration: 60,
+      definition: 55,
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -167,6 +206,16 @@ proc createTestScenarioManager(): ScenarioManager =
       ),
       locations: @[],
     ),
+    definition: DefinitionConfig(
+      enabled: true,
+      location: DefinitionContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
+    ),
     delays: DelayConfig(
       hover: 0,
       completion: 0,
@@ -174,6 +223,7 @@ proc createTestScenarioManager(): ScenarioManager =
       semanticTokens: 0,
       inlayHint: 0,
       declaration: 0,
+      definition: 0,
     ),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
@@ -182,6 +232,7 @@ proc createTestScenarioManager(): ScenarioManager =
       "semanticTokens": ErrorConfig(code: -32603, message: "Semantic tokens error"),
       "inlayHint": ErrorConfig(code: -32603, message: "Inlay hint error"),
       "declaration": ErrorConfig(code: -32603, message: "Declaration error"),
+      "definition": ErrorConfig(code: -32603, message: "Definition error"),
     }.toTable,
   )
 
@@ -218,9 +269,11 @@ suite "lsp_handler module tests":
     check capabilities.hasKey("semanticTokensProvider")
     check capabilities.hasKey("inlayHintProvider")
     check capabilities.hasKey("declarationProvider")
+    check capabilities.hasKey("definitionProvider")
 
     check capabilities["hoverProvider"].getBool() == true
     check capabilities["declarationProvider"].getBool() == true
+    check capabilities["definitionProvider"].getBool() == true
 
     let serverInfo = response["serverInfo"]
     check serverInfo["name"].getStr() == "LSP Test Server"
@@ -1402,5 +1455,239 @@ suite "lsp_handler module tests":
       }
 
     let response = waitFor handler.handleDeclaration(%1, params)
+
+    check response.kind == JNull
+
+  test "handleDefinition with enabled definition":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has definition configured
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let response = waitFor handler.handleDefinition(%1, params)
+
+    # Should return array of locations since scenario has both location and locations
+    # When both exist, locations takes precedence and returns array
+    check response.kind == JArray
+    check response.len == 2
+
+    # Check first location
+    let loc1 = response[0]
+    check loc1["uri"].getStr() == "file:///implementation1.nim"
+    check loc1["range"]["start"]["line"].getInt() == 10
+    check loc1["range"]["start"]["character"].getInt() == 4
+    check loc1["range"]["end"]["line"].getInt() == 10
+    check loc1["range"]["end"]["character"].getInt() == 14
+
+    # Check second location
+    let loc2 = response[1]
+    check loc2["uri"].getStr() == "file:///implementation2.nim"
+    check loc2["range"]["start"]["line"].getInt() == 20
+    check loc2["range"]["start"]["character"].getInt() == 8
+    check loc2["range"]["end"]["line"].getInt() == 20
+    check loc2["range"]["end"]["character"].getInt() == 18
+
+  test "handleDefinition with single location only":
+    let sm = createTestScenarioManager()
+    # Create scenario with only single location
+    sm.scenarios["single_definition"] = Scenario(
+      name: "Single Definition",
+      hover: HoverConfig(enabled: false),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: true,
+        location: DefinitionContent(
+          uri: "file:///single_definition.nim",
+          range: Range(
+            start: Position(line: 25, character: 2),
+            `end`: Position(line: 25, character: 12),
+          ),
+        ),
+        locations: @[], # Empty locations array
+      ),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "single_definition"
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let response = waitFor handler.handleDefinition(%1, params)
+
+    # Should return single location object
+    check response.kind == JObject
+    check response["uri"].getStr() == "file:///single_definition.nim"
+    check response["range"]["start"]["line"].getInt() == 25
+    check response["range"]["start"]["character"].getInt() == 2
+    check response["range"]["end"]["line"].getInt() == 25
+    check response["range"]["end"]["character"].getInt() == 12
+
+  test "handleDefinition with disabled definition":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has definition disabled
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleDefinition(%1, params)
+
+    check response.kind == JNull
+
+  test "handleDefinition with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    expect LSPError:
+      discard waitFor handler.handleDefinition(%1, params)
+
+  test "handleDefinition with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 55ms delay for definition
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDefinition(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 45ms due to 55ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 45
+
+    check response.kind == JArray
+    check response.len == 2
+
+  test "handleDefinition with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleDefinition(%1, params)
+
+    check response.kind == JNull
+
+  test "handleDefinition with no definition configured":
+    let sm = createTestScenarioManager()
+    # Create scenario with definition enabled but no location/locations configured
+    sm.scenarios["no_definitions"] = Scenario(
+      name: "No Definitions",
+      hover: HoverConfig(enabled: false),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: true,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "no_definitions"
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let response = waitFor handler.handleDefinition(%1, params)
 
     check response.kind == JNull
