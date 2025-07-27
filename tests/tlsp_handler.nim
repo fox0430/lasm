@@ -39,6 +39,16 @@ proc createTestScenarioManager(): ScenarioManager =
       ),
       locations: @[],
     ),
+    typeDefinition: TypeDefinitionConfig(
+      enabled: false,
+      location: TypeDefinitionContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
+    ),
     delays: DelayConfig(
       hover: 0,
       completion: 0,
@@ -47,6 +57,7 @@ proc createTestScenarioManager(): ScenarioManager =
       inlayHint: 0,
       declaration: 0,
       definition: 0,
+      typeDefinition: 0,
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -176,6 +187,33 @@ proc createTestScenarioManager(): ScenarioManager =
           ),
         ],
     ),
+    typeDefinition: TypeDefinitionConfig(
+      enabled: true,
+      location: TypeDefinitionContent(
+        uri: "file:///test_type_definition.nim",
+        range: Range(
+          start: Position(line: 8, character: 0),
+          `end`: Position(line: 8, character: 10),
+        ),
+      ),
+      locations:
+        @[
+          TypeDefinitionContent(
+            uri: "file:///type_definition1.nim",
+            range: Range(
+              start: Position(line: 5, character: 0),
+              `end`: Position(line: 5, character: 15),
+            ),
+          ),
+          TypeDefinitionContent(
+            uri: "file:///type_definition2.nim",
+            range: Range(
+              start: Position(line: 12, character: 5),
+              `end`: Position(line: 12, character: 20),
+            ),
+          ),
+        ],
+    ),
     delays: DelayConfig(
       hover: 50,
       completion: 30,
@@ -184,6 +222,7 @@ proc createTestScenarioManager(): ScenarioManager =
       inlayHint: 40,
       declaration: 60,
       definition: 55,
+      typeDefinition: 45,
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -216,6 +255,16 @@ proc createTestScenarioManager(): ScenarioManager =
       ),
       locations: @[],
     ),
+    typeDefinition: TypeDefinitionConfig(
+      enabled: false,
+      location: TypeDefinitionContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
+    ),
     delays: DelayConfig(
       hover: 0,
       completion: 0,
@@ -224,6 +273,7 @@ proc createTestScenarioManager(): ScenarioManager =
       inlayHint: 0,
       declaration: 0,
       definition: 0,
+      typeDefinition: 0,
     ),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
@@ -233,6 +283,7 @@ proc createTestScenarioManager(): ScenarioManager =
       "inlayHint": ErrorConfig(code: -32603, message: "Inlay hint error"),
       "declaration": ErrorConfig(code: -32603, message: "Declaration error"),
       "definition": ErrorConfig(code: -32603, message: "Definition error"),
+      "typeDefinition": ErrorConfig(code: -32603, message: "Type definition error"),
     }.toTable,
   )
 
@@ -270,10 +321,12 @@ suite "lsp_handler module tests":
     check capabilities.hasKey("inlayHintProvider")
     check capabilities.hasKey("declarationProvider")
     check capabilities.hasKey("definitionProvider")
+    check capabilities.hasKey("typeDefinitionProvider")
 
     check capabilities["hoverProvider"].getBool() == true
     check capabilities["declarationProvider"].getBool() == true
     check capabilities["definitionProvider"].getBool() == true
+    check capabilities["typeDefinitionProvider"].getBool() == true
 
     let serverInfo = response["serverInfo"]
     check serverInfo["name"].getStr() == "LSP Test Server"
@@ -516,7 +569,25 @@ suite "lsp_handler module tests":
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
-        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -618,7 +689,25 @@ suite "lsp_handler module tests":
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
-        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -691,7 +780,25 @@ suite "lsp_handler module tests":
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
       inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
-        hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0, inlayHint: 0
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -966,7 +1073,27 @@ suite "lsp_handler module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: true, tokens: @[]),
-      delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0, semanticTokens: 0),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
       errors: initTable[string, ErrorConfig](),
     )
     sm.currentScenario = "no_tokens"
@@ -1314,6 +1441,19 @@ suite "lsp_handler module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -1438,6 +1578,19 @@ suite "lsp_handler module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -1536,6 +1689,18 @@ suite "lsp_handler module tests":
         inlayHint: 0,
         declaration: 0,
         definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -1672,6 +1837,18 @@ suite "lsp_handler module tests":
         inlayHint: 0,
         declaration: 0,
         definition: 0,
+        typeDefinition: 0,
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )

@@ -78,6 +78,15 @@ type
     location*: DefinitionContent
     locations*: seq[DefinitionContent]
 
+  TypeDefinitionContent* = object
+    uri*: string
+    range*: Range
+
+  TypeDefinitionConfig* = object
+    enabled*: bool
+    location*: TypeDefinitionContent
+    locations*: seq[TypeDefinitionContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -86,6 +95,7 @@ type
     inlayHint*: int
     declaration*: int
     definition*: int
+    typeDefinition*: int
 
   ErrorConfig* = object
     code*: int
@@ -104,6 +114,7 @@ type
     inlayHint*: InlayHintConfig
     declaration*: DeclarationConfig
     definition*: DefinitionConfig
+    typeDefinition*: TypeDefinitionConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -501,6 +512,64 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             locations: @[],
           )
 
+        if scenarioData.hasKey("typeDefinition"):
+          # Load type definition configuration
+          let typeDefinitionNode = scenarioData["typeDefinition"]
+          var tdefc =
+            TypeDefinitionConfig(enabled: typeDefinitionNode["enabled"].getBool(false))
+          if tdefc.enabled:
+            # Handle single location
+            if typeDefinitionNode.contains("location"):
+              let locNode = typeDefinitionNode["location"]
+              tdefc.location = TypeDefinitionContent(
+                uri: locNode["uri"].getStr(""),
+                range: Range(
+                  start: Position(
+                    line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                    character:
+                      uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                  ),
+                  `end`: Position(
+                    line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                    character: uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                  ),
+                ),
+              )
+            # Handle multiple locations
+            if typeDefinitionNode.contains("locations"):
+              tdefc.locations = @[]
+              for locNode in typeDefinitionNode["locations"]:
+                let tdefContent = TypeDefinitionContent(
+                  uri: locNode["uri"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                tdefc.locations.add(tdefContent)
+          scenario.typeDefinition = tdefc
+        else:
+          # Default type definition config if not specified
+          scenario.typeDefinition = TypeDefinitionConfig(
+            enabled: false,
+            location: TypeDefinitionContent(
+              uri: "",
+              range: Range(
+                start: Position(line: 0, character: 0),
+                `end`: Position(line: 0, character: 0),
+              ),
+            ),
+            locations: @[],
+          )
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -512,6 +581,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
             declaration: delaysNode{"declaration"}.getInt(0),
             definition: delaysNode{"definition"}.getInt(0),
+            typeDefinition: delaysNode{"typeDefinition"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -523,6 +593,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             inlayHint: 0,
             declaration: 0,
             definition: 0,
+            typeDefinition: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -682,6 +753,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "inlayHint": 25,
             "declaration": 40,
             "definition": 35,
+            "typeDefinition": 30,
           },
           "semanticTokens": {
             "enabled": true,
@@ -704,6 +776,16 @@ proc createSampleConfig*(sm: ScenarioManager) =
               "range": {
                 "start": {"line": 25, "character": 2},
                 "end": {"line": 25, "character": 12},
+              },
+            },
+          },
+          "typeDefinition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///path/to/type.nim",
+              "range": {
+                "start": {"line": 8, "character": 0},
+                "end": {"line": 8, "character": 10},
               },
             },
           },

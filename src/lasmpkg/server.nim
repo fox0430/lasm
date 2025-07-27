@@ -164,6 +164,13 @@ proc handleDefinition(server: LSPServer, id: JsonNode, params: JsonNode) {.async
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleTypeDefinition(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleTypeDefinition(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
   let params =
@@ -208,6 +215,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleDeclaration(id, params)
   of "textDocument/definition":
     await server.handleDefinition(id, params)
+  of "textDocument/typeDefinition":
+    await server.handleTypeDefinition(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":
