@@ -52,6 +52,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/declaration | |
 | textDocument/definition | |
 | textDocument/typeDefinition | |
+| textDocument/implementation | |
 | textDocument/shutdown | |
 
 ## Commands

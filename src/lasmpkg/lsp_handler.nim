@@ -90,6 +90,9 @@ proc handleInitialize*(
   # Set type definition provider
   serverCapabilities.typeDefinitionProvider = some(true)
 
+  # Set implementation provider
+  serverCapabilities.implementationProvider = some(%true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -884,6 +887,56 @@ proc handleTypeDefinition*(
       return %location
     else:
       # No type definition found
+      return newJNull()
+  else:
+    # Document not found
+    return newJNull()
+
+proc handleImplementation*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.implementation > 0:
+    await sleepAsync(scenario.delays.implementation.milliseconds)
+
+  # Check if implementation is enabled
+  if not scenario.implementation.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "implementation" in scenario.errors:
+    let error = scenario.errors["implementation"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create implementation response from scenario configuration
+    if scenario.implementation.locations.len > 0:
+      # Return array of locations
+      var locations: seq[JsonNode] = @[]
+      for loc in scenario.implementation.locations:
+        let location = Location()
+        location.uri = loc.uri
+        location.range = loc.range
+        locations.add(%location)
+      return %locations
+    elif scenario.implementation.location.uri != "":
+      # Return single location
+      let location = Location()
+      location.uri = scenario.implementation.location.uri
+      location.range = scenario.implementation.location.range
+      return %location
+    else:
+      # No implementation found
       return newJNull()
   else:
     # Document not found

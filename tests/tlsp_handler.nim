@@ -58,6 +58,17 @@ proc createTestScenarioManager(): ScenarioManager =
       declaration: 0,
       definition: 0,
       typeDefinition: 0,
+      implementation: 0,
+    ),
+    implementation: ImplementationConfig(
+      enabled: false,
+      location: ImplementationContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -223,6 +234,34 @@ proc createTestScenarioManager(): ScenarioManager =
       declaration: 60,
       definition: 55,
       typeDefinition: 45,
+      implementation: 50,
+    ),
+    implementation: ImplementationConfig(
+      enabled: true,
+      location: ImplementationContent(
+        uri: "file:///test_implementation.nim",
+        range: Range(
+          start: Position(line: 30, character: 0),
+          `end`: Position(line: 30, character: 20),
+        ),
+      ),
+      locations:
+        @[
+          ImplementationContent(
+            uri: "file:///implementation1.nim",
+            range: Range(
+              start: Position(line: 25, character: 0),
+              `end`: Position(line: 25, character: 15),
+            ),
+          ),
+          ImplementationContent(
+            uri: "file:///implementation2.nim",
+            range: Range(
+              start: Position(line: 35, character: 2),
+              `end`: Position(line: 35, character: 17),
+            ),
+          ),
+        ],
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -274,6 +313,17 @@ proc createTestScenarioManager(): ScenarioManager =
       declaration: 0,
       definition: 0,
       typeDefinition: 0,
+      implementation: 0,
+    ),
+    implementation: ImplementationConfig(
+      enabled: true,
+      location: ImplementationContent(
+        uri: "",
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 0)
+        ),
+      ),
+      locations: @[],
     ),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
@@ -284,6 +334,7 @@ proc createTestScenarioManager(): ScenarioManager =
       "declaration": ErrorConfig(code: -32603, message: "Declaration error"),
       "definition": ErrorConfig(code: -32603, message: "Definition error"),
       "typeDefinition": ErrorConfig(code: -32603, message: "Type definition error"),
+      "implementation": ErrorConfig(code: -32603, message: "Implementation error"),
     }.toTable,
   )
 
@@ -322,11 +373,13 @@ suite "lsp_handler module tests":
     check capabilities.hasKey("declarationProvider")
     check capabilities.hasKey("definitionProvider")
     check capabilities.hasKey("typeDefinitionProvider")
+    check capabilities.hasKey("implementationProvider")
 
     check capabilities["hoverProvider"].getBool() == true
     check capabilities["declarationProvider"].getBool() == true
     check capabilities["definitionProvider"].getBool() == true
     check capabilities["typeDefinitionProvider"].getBool() == true
+    check capabilities["implementationProvider"].getBool() == true
 
     let serverInfo = response["serverInfo"]
     check serverInfo["name"].getStr() == "LSP Test Server"
@@ -1739,6 +1792,114 @@ suite "lsp_handler module tests":
       }
 
     let response = waitFor handler.handleDefinition(%1, params)
+
+    check response.kind == JNull
+
+  test "handleImplementation with enabled implementation":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has implementation configured
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let response = waitFor handler.handleImplementation(%1, params)
+
+    # Should return array of locations since scenario has both location and locations
+    # When both exist, locations takes precedence and returns array
+    check response.kind == JArray
+    check response.len == 2
+
+    # Check first location
+    let loc1 = response[0]
+    check loc1["uri"].getStr() == "file:///implementation1.nim"
+    check loc1["range"]["start"]["line"].getInt() == 25
+    check loc1["range"]["start"]["character"].getInt() == 0
+    check loc1["range"]["end"]["line"].getInt() == 25
+    check loc1["range"]["end"]["character"].getInt() == 15
+
+    # Check second location
+    let loc2 = response[1]
+    check loc2["uri"].getStr() == "file:///implementation2.nim"
+    check loc2["range"]["start"]["line"].getInt() == 35
+    check loc2["range"]["start"]["character"].getInt() == 2
+    check loc2["range"]["end"]["line"].getInt() == 35
+    check loc2["range"]["end"]["character"].getInt() == 17
+
+  test "handleImplementation with disabled implementation":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has implementation disabled
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleImplementation(%1, params)
+
+    check response.kind == JNull
+
+  test "handleImplementation with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    expect LSPError:
+      discard waitFor handler.handleImplementation(%1, params)
+
+  test "handleImplementation with delay":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # This scenario has 50ms delay for implementation
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleImplementation(%1, params)
+    let endTime = getTime()
+
+    # Check that some delay occurred (should be at least 40ms due to 50ms delay)
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 40
+
+    check response.kind == JArray
+    check response.len == 2
+
+  test "handleImplementation with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleImplementation(%1, params)
 
     check response.kind == JNull
 
