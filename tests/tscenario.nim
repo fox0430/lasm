@@ -2015,6 +2015,7 @@ suite "scenario module tests":
       declaration: 80,
       definition: 70,
       typeDefinition: 60,
+      implementation: 85,
     )
 
     check delayConfig.hover == 150
@@ -2025,3 +2026,280 @@ suite "scenario module tests":
     check delayConfig.declaration == 80
     check delayConfig.definition == 70
     check delayConfig.typeDefinition == 60
+    check delayConfig.implementation == 85
+
+  test "ImplementationConfig initialization":
+    let implementationContent = ImplementationContent(
+      uri: "file:///test_implementation.nim",
+      range: Range(
+        start: Position(line: 12, character: 3),
+        `end`: Position(line: 12, character: 13),
+      ),
+    )
+
+    let implementationConfig = ImplementationConfig(
+      enabled: true,
+      location: implementationContent,
+      locations: @[implementationContent],
+    )
+
+    check implementationConfig.enabled == true
+    check implementationConfig.location.uri == "file:///test_implementation.nim"
+    check implementationConfig.location.range.start.line == 12
+    check implementationConfig.location.range.start.character == 3
+    check implementationConfig.location.range.`end`.line == 12
+    check implementationConfig.location.range.`end`.character == 13
+    check implementationConfig.locations.len == 1
+    check implementationConfig.locations[0].uri == "file:///test_implementation.nim"
+
+  test "loadConfigFile with implementation configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_implementation_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "implementation_test",
+        "scenarios": {
+          "implementation_test": {
+            "name": "Implementation Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///single_implementation.nim",
+                "range": {
+                  "start": {"line": 18, "character": 4},
+                  "end": {"line": 18, "character": 14},
+                },
+              },
+              "locations": [
+                {
+                  "uri": "file:///multi_implementation1.nim",
+                  "range": {
+                    "start": {"line": 6, "character": 2},
+                    "end": {"line": 6, "character": 12},
+                  },
+                },
+                {
+                  "uri": "file:///multi_implementation2.nim",
+                  "range": {
+                    "start": {"line": 15, "character": 8},
+                    "end": {"line": 15, "character": 18},
+                  },
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 110,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "implementation_test"
+    check sm.scenarios.len == 1
+    check "implementation_test" in sm.scenarios
+
+    let scenario = sm.scenarios["implementation_test"]
+    check scenario.name == "Implementation Test Scenario"
+    check scenario.implementation.enabled == true
+    check scenario.delays.implementation == 110
+
+    # Check single location
+    check scenario.implementation.location.uri == "file:///single_implementation.nim"
+    check scenario.implementation.location.range.start.line == 18
+    check scenario.implementation.location.range.start.character == 4
+    check scenario.implementation.location.range.`end`.line == 18
+    check scenario.implementation.location.range.`end`.character == 14
+
+    # Check multiple locations
+    check scenario.implementation.locations.len == 2
+    let loc1 = scenario.implementation.locations[0]
+    check loc1.uri == "file:///multi_implementation1.nim"
+    check loc1.range.start.line == 6
+    check loc1.range.start.character == 2
+    check loc1.range.`end`.line == 6
+    check loc1.range.`end`.character == 12
+
+    let loc2 = scenario.implementation.locations[1]
+    check loc2.uri == "file:///multi_implementation2.nim"
+    check loc2.range.start.line == 15
+    check loc2.range.start.character == 8
+    check loc2.range.`end`.line == 15
+    check loc2.range.`end`.character == 18
+
+  test "loadConfigFile with disabled implementation":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_implementation_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_implementation",
+        "scenarios": {
+          "no_implementation": {
+            "name": "No Implementation Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_implementation"]
+    check scenario.implementation.enabled == false
+    check scenario.implementation.location.uri == ""
+    check scenario.implementation.locations.len == 0
+
+  test "loadConfigFile without implementation configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_implementation_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_impl_config",
+        "scenarios": {
+          "no_impl_config": {
+            "name": "No Implementation Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_impl_config"]
+    check scenario.implementation.enabled == false
+    check scenario.implementation.location.uri == ""
+    check scenario.implementation.locations.len == 0
+
+  test "loadConfigFile with minimal implementation configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_implementation_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_impl",
+        "scenarios": {
+          "minimal_impl": {
+            "name": "Minimal Implementation Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///minimal_impl.nim",
+                "range": {
+                  "start": {"line": 2, "character": 0},
+                  "end": {"line": 2, "character": 10},
+                },
+              },
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_impl"]
+    check scenario.implementation.enabled == true
+    check scenario.implementation.location.uri == "file:///minimal_impl.nim"
+    check scenario.implementation.location.range.start.line == 2
+    check scenario.implementation.location.range.start.character == 0
+    check scenario.implementation.location.range.`end`.line == 2
+    check scenario.implementation.location.range.`end`.character == 10
+    # locations should be empty since not specified
+    check scenario.implementation.locations.len == 0

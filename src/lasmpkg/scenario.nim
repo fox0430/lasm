@@ -87,6 +87,15 @@ type
     location*: TypeDefinitionContent
     locations*: seq[TypeDefinitionContent]
 
+  ImplementationContent* = object
+    uri*: string
+    range*: Range
+
+  ImplementationConfig* = object
+    enabled*: bool
+    location*: ImplementationContent
+    locations*: seq[ImplementationContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -96,6 +105,7 @@ type
     declaration*: int
     definition*: int
     typeDefinition*: int
+    implementation*: int
 
   ErrorConfig* = object
     code*: int
@@ -115,6 +125,7 @@ type
     declaration*: DeclarationConfig
     definition*: DefinitionConfig
     typeDefinition*: TypeDefinitionConfig
+    implementation*: ImplementationConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -570,6 +581,64 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             locations: @[],
           )
 
+        if scenarioData.hasKey("implementation"):
+          # Load implementation configuration
+          let implementationNode = scenarioData["implementation"]
+          var imc =
+            ImplementationConfig(enabled: implementationNode["enabled"].getBool(false))
+          if imc.enabled:
+            # Handle single location
+            if implementationNode.contains("location"):
+              let locNode = implementationNode["location"]
+              imc.location = ImplementationContent(
+                uri: locNode["uri"].getStr(""),
+                range: Range(
+                  start: Position(
+                    line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                    character:
+                      uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                  ),
+                  `end`: Position(
+                    line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                    character: uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                  ),
+                ),
+              )
+            # Handle multiple locations
+            if implementationNode.contains("locations"):
+              imc.locations = @[]
+              for locNode in implementationNode["locations"]:
+                let imcContent = ImplementationContent(
+                  uri: locNode["uri"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                imc.locations.add(imcContent)
+          scenario.implementation = imc
+        else:
+          # Default implementation config if not specified
+          scenario.implementation = ImplementationConfig(
+            enabled: false,
+            location: ImplementationContent(
+              uri: "",
+              range: Range(
+                start: Position(line: 0, character: 0),
+                `end`: Position(line: 0, character: 0),
+              ),
+            ),
+            locations: @[],
+          )
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -582,6 +651,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             declaration: delaysNode{"declaration"}.getInt(0),
             definition: delaysNode{"definition"}.getInt(0),
             typeDefinition: delaysNode{"typeDefinition"}.getInt(0),
+            implementation: delaysNode{"implementation"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -594,6 +664,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             declaration: 0,
             definition: 0,
             typeDefinition: 0,
+            implementation: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -754,6 +825,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "declaration": 40,
             "definition": 35,
             "typeDefinition": 30,
+            "implementation": 35,
           },
           "semanticTokens": {
             "enabled": true,
@@ -786,6 +858,16 @@ proc createSampleConfig*(sm: ScenarioManager) =
               "range": {
                 "start": {"line": 8, "character": 0},
                 "end": {"line": 8, "character": 10},
+              },
+            },
+          },
+          "implementation": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///path/to/implementation.nim",
+              "range": {
+                "start": {"line": 30, "character": 0},
+                "end": {"line": 30, "character": 20},
               },
             },
           },
@@ -831,6 +913,25 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "range": {
                   "start": {"line": 20, "character": 6},
                   "end": {"line": 20, "character": 16},
+                },
+              },
+            ],
+          },
+          "implementation": {
+            "enabled": true,
+            "locations": [
+              {
+                "uri": "file:///path/to/implementation1.nim",
+                "range": {
+                  "start": {"line": 25, "character": 0},
+                  "end": {"line": 25, "character": 15},
+                },
+              },
+              {
+                "uri": "file:///path/to/implementation2.nim",
+                "range": {
+                  "start": {"line": 30, "character": 2},
+                  "end": {"line": 30, "character": 17},
                 },
               },
             ],
