@@ -35,6 +35,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 100,
         completion: 0,
@@ -42,6 +43,41 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -165,6 +201,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 0,
         completion: 0,
@@ -173,6 +210,39 @@ suite "scenario module tests":
         inlayHint: 0,
         declaration: 0,
         definition: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -191,6 +261,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 100,
         completion: 0,
@@ -198,6 +269,41 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -216,6 +322,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 100,
         completion: 0,
@@ -223,6 +330,41 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -250,6 +392,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 50,
         completion: 0,
@@ -257,6 +400,39 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -267,6 +443,7 @@ suite "scenario module tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
       delays: DelayConfig(
         hover: 100,
         completion: 0,
@@ -274,6 +451,41 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+      ),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -351,6 +563,7 @@ suite "scenario module tests":
       inlayHint: 50,
       declaration: 80,
       definition: 70,
+      typeDefinition: 60,
     )
 
     check delayConfig.hover == 150
@@ -360,6 +573,7 @@ suite "scenario module tests":
     check delayConfig.inlayHint == 50
     check delayConfig.declaration == 80
     check delayConfig.definition == 70
+    check delayConfig.typeDefinition == 60
 
   test "SemanticTokensConfig initialization":
     let semanticTokensConfig = SemanticTokensConfig(
@@ -1523,3 +1737,291 @@ suite "scenario module tests":
     check scenario.definition.location.range.`end`.character == 10
     # locations should be empty since not specified
     check scenario.definition.locations.len == 0
+
+  test "TypeDefinitionConfig initialization":
+    let typeDefinitionContent = TypeDefinitionContent(
+      uri: "file:///test_type_definition.nim",
+      range: Range(
+        start: Position(line: 8, character: 0), `end`: Position(line: 8, character: 10)
+      ),
+    )
+
+    let typeDefinitionConfig = TypeDefinitionConfig(
+      enabled: true,
+      location: typeDefinitionContent,
+      locations: @[typeDefinitionContent],
+    )
+
+    check typeDefinitionConfig.enabled == true
+    check typeDefinitionConfig.location.uri == "file:///test_type_definition.nim"
+    check typeDefinitionConfig.location.range.start.line == 8
+    check typeDefinitionConfig.location.range.start.character == 0
+    check typeDefinitionConfig.location.range.`end`.line == 8
+    check typeDefinitionConfig.location.range.`end`.character == 10
+    check typeDefinitionConfig.locations.len == 1
+    check typeDefinitionConfig.locations[0].uri == "file:///test_type_definition.nim"
+
+  test "loadConfigFile with typeDefinition configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_type_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "type_definition_test",
+        "scenarios": {
+          "type_definition_test": {
+            "name": "Type Definition Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///single_type_definition.nim",
+                "range": {
+                  "start": {"line": 8, "character": 0},
+                  "end": {"line": 8, "character": 10},
+                },
+              },
+              "locations": [
+                {
+                  "uri": "file:///multi_type_definition1.nim",
+                  "range": {
+                    "start": {"line": 5, "character": 0},
+                    "end": {"line": 5, "character": 15},
+                  },
+                },
+                {
+                  "uri": "file:///multi_type_definition2.nim",
+                  "range": {
+                    "start": {"line": 12, "character": 5},
+                    "end": {"line": 12, "character": 20},
+                  },
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 120,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "type_definition_test"
+    check sm.scenarios.len == 1
+    check "type_definition_test" in sm.scenarios
+
+    let scenario = sm.scenarios["type_definition_test"]
+    check scenario.name == "Type Definition Test Scenario"
+    check scenario.typeDefinition.enabled == true
+    check scenario.delays.typeDefinition == 120
+
+    # Check single location
+    check scenario.typeDefinition.location.uri == "file:///single_type_definition.nim"
+    check scenario.typeDefinition.location.range.start.line == 8
+    check scenario.typeDefinition.location.range.start.character == 0
+    check scenario.typeDefinition.location.range.`end`.line == 8
+    check scenario.typeDefinition.location.range.`end`.character == 10
+
+    # Check multiple locations
+    check scenario.typeDefinition.locations.len == 2
+    let loc1 = scenario.typeDefinition.locations[0]
+    check loc1.uri == "file:///multi_type_definition1.nim"
+    check loc1.range.start.line == 5
+    check loc1.range.start.character == 0
+    check loc1.range.`end`.line == 5
+    check loc1.range.`end`.character == 15
+
+    let loc2 = scenario.typeDefinition.locations[1]
+    check loc2.uri == "file:///multi_type_definition2.nim"
+    check loc2.range.start.line == 12
+    check loc2.range.start.character == 5
+    check loc2.range.`end`.line == 12
+    check loc2.range.`end`.character == 20
+
+  test "loadConfigFile with disabled typeDefinition":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_type_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_type_definition",
+        "scenarios": {
+          "no_type_definition": {
+            "name": "No Type Definition Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_type_definition"]
+    check scenario.typeDefinition.enabled == false
+    check scenario.typeDefinition.location.uri == ""
+    check scenario.typeDefinition.locations.len == 0
+
+  test "loadConfigFile without typeDefinition configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_type_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_type_def_config",
+        "scenarios": {
+          "no_type_def_config": {
+            "name": "No Type Definition Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_type_def_config"]
+    check scenario.typeDefinition.enabled == false
+    check scenario.typeDefinition.location.uri == ""
+    check scenario.typeDefinition.locations.len == 0
+
+  test "loadConfigFile with minimal typeDefinition configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_type_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_type_def",
+        "scenarios": {
+          "minimal_type_def": {
+            "name": "Minimal Type Definition Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///minimal_type.nim",
+                "range": {
+                  "start": {"line": 3, "character": 5},
+                  "end": {"line": 3, "character": 15},
+                },
+              },
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_type_def"]
+    check scenario.typeDefinition.enabled == true
+    check scenario.typeDefinition.location.uri == "file:///minimal_type.nim"
+    check scenario.typeDefinition.location.range.start.line == 3
+    check scenario.typeDefinition.location.range.start.character == 5
+    check scenario.typeDefinition.location.range.`end`.line == 3
+    check scenario.typeDefinition.location.range.`end`.character == 15
+    # locations should be empty since not specified
+    check scenario.typeDefinition.locations.len == 0
+
+  test "DelayConfig with typeDefinition field":
+    let delayConfig = DelayConfig(
+      hover: 150,
+      completion: 100,
+      diagnostics: 200,
+      semanticTokens: 75,
+      inlayHint: 50,
+      declaration: 80,
+      definition: 70,
+      typeDefinition: 60,
+    )
+
+    check delayConfig.hover == 150
+    check delayConfig.completion == 100
+    check delayConfig.diagnostics == 200
+    check delayConfig.semanticTokens == 75
+    check delayConfig.inlayHint == 50
+    check delayConfig.declaration == 80
+    check delayConfig.definition == 70
+    check delayConfig.typeDefinition == 60
