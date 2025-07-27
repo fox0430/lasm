@@ -172,6 +172,7 @@ suite "scenario module tests":
         semanticTokens: 0,
         inlayHint: 0,
         declaration: 0,
+        definition: 0,
       ),
       errors: initTable[string, ErrorConfig](),
     )
@@ -349,6 +350,7 @@ suite "scenario module tests":
       semanticTokens: 75,
       inlayHint: 50,
       declaration: 80,
+      definition: 70,
     )
 
     check delayConfig.hover == 150
@@ -357,6 +359,7 @@ suite "scenario module tests":
     check delayConfig.semanticTokens == 75
     check delayConfig.inlayHint == 50
     check delayConfig.declaration == 80
+    check delayConfig.definition == 70
 
   test "SemanticTokensConfig initialization":
     let semanticTokensConfig = SemanticTokensConfig(
@@ -1262,3 +1265,261 @@ suite "scenario module tests":
     check scenario.declaration.location.range.`end`.character == 10
     # locations should be empty since not specified
     check scenario.declaration.locations.len == 0
+
+  test "DefinitionConfig initialization":
+    let definitionContent = DefinitionContent(
+      uri: "file:///test_definition.nim",
+      range: Range(
+        start: Position(line: 15, character: 2),
+        `end`: Position(line: 15, character: 12),
+      ),
+    )
+
+    let definitionConfig = DefinitionConfig(
+      enabled: true, location: definitionContent, locations: @[definitionContent]
+    )
+
+    check definitionConfig.enabled == true
+    check definitionConfig.location.uri == "file:///test_definition.nim"
+    check definitionConfig.location.range.start.line == 15
+    check definitionConfig.location.range.start.character == 2
+    check definitionConfig.location.range.`end`.line == 15
+    check definitionConfig.location.range.`end`.character == 12
+    check definitionConfig.locations.len == 1
+    check definitionConfig.locations[0].uri == "file:///test_definition.nim"
+
+  test "loadConfigFile with definition configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "definition_test",
+        "scenarios": {
+          "definition_test": {
+            "name": "Definition Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///single_definition.nim",
+                "range": {
+                  "start": {"line": 25, "character": 2},
+                  "end": {"line": 25, "character": 12},
+                },
+              },
+              "locations": [
+                {
+                  "uri": "file:///multi_definition1.nim",
+                  "range": {
+                    "start": {"line": 10, "character": 4},
+                    "end": {"line": 10, "character": 14},
+                  },
+                },
+                {
+                  "uri": "file:///multi_definition2.nim",
+                  "range": {
+                    "start": {"line": 20, "character": 8},
+                    "end": {"line": 20, "character": 18},
+                  },
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 90,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "definition_test"
+    check sm.scenarios.len == 1
+    check "definition_test" in sm.scenarios
+
+    let scenario = sm.scenarios["definition_test"]
+    check scenario.name == "Definition Test Scenario"
+    check scenario.definition.enabled == true
+    check scenario.delays.definition == 90
+
+    # Check single location
+    check scenario.definition.location.uri == "file:///single_definition.nim"
+    check scenario.definition.location.range.start.line == 25
+    check scenario.definition.location.range.start.character == 2
+    check scenario.definition.location.range.`end`.line == 25
+    check scenario.definition.location.range.`end`.character == 12
+
+    # Check multiple locations
+    check scenario.definition.locations.len == 2
+    let loc1 = scenario.definition.locations[0]
+    check loc1.uri == "file:///multi_definition1.nim"
+    check loc1.range.start.line == 10
+    check loc1.range.start.character == 4
+    check loc1.range.`end`.line == 10
+    check loc1.range.`end`.character == 14
+
+    let loc2 = scenario.definition.locations[1]
+    check loc2.uri == "file:///multi_definition2.nim"
+    check loc2.range.start.line == 20
+    check loc2.range.start.character == 8
+    check loc2.range.`end`.line == 20
+    check loc2.range.`end`.character == 18
+
+  test "loadConfigFile with disabled definition":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_definition",
+        "scenarios": {
+          "no_definition": {
+            "name": "No Definition Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_definition"]
+    check scenario.definition.enabled == false
+    check scenario.definition.location.uri == ""
+    check scenario.definition.locations.len == 0
+
+  test "loadConfigFile without definition configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_def_config",
+        "scenarios": {
+          "no_def_config": {
+            "name": "No Definition Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_def_config"]
+    check scenario.definition.enabled == false
+    check scenario.definition.location.uri == ""
+    check scenario.definition.locations.len == 0
+
+  test "loadConfigFile with minimal definition configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_definition_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_def",
+        "scenarios": {
+          "minimal_def": {
+            "name": "Minimal Definition Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {
+              "enabled": true,
+              "location": {
+                "uri": "file:///minimal.nim",
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 5, "character": 10},
+                },
+              },
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_def"]
+    check scenario.definition.enabled == true
+    check scenario.definition.location.uri == "file:///minimal.nim"
+    check scenario.definition.location.range.start.line == 5
+    check scenario.definition.location.range.start.character == 0
+    check scenario.definition.location.range.`end`.line == 5
+    check scenario.definition.location.range.`end`.character == 10
+    # locations should be empty since not specified
+    check scenario.definition.locations.len == 0

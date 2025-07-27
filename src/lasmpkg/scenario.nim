@@ -69,6 +69,15 @@ type
     location*: DeclarationContent
     locations*: seq[DeclarationContent]
 
+  DefinitionContent* = object
+    uri*: string
+    range*: Range
+
+  DefinitionConfig* = object
+    enabled*: bool
+    location*: DefinitionContent
+    locations*: seq[DefinitionContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -76,6 +85,7 @@ type
     semanticTokens*: int
     inlayHint*: int
     declaration*: int
+    definition*: int
 
   ErrorConfig* = object
     code*: int
@@ -93,6 +103,7 @@ type
     semanticTokens*: SemanticTokensConfig
     inlayHint*: InlayHintConfig
     declaration*: DeclarationConfig
+    definition*: DefinitionConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -433,6 +444,63 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             locations: @[],
           )
 
+        if scenarioData.hasKey("definition"):
+          # Load definition configuration
+          let definitionNode = scenarioData["definition"]
+          var defc = DefinitionConfig(enabled: definitionNode["enabled"].getBool(false))
+          if defc.enabled:
+            # Handle single location
+            if definitionNode.contains("location"):
+              let locNode = definitionNode["location"]
+              defc.location = DefinitionContent(
+                uri: locNode["uri"].getStr(""),
+                range: Range(
+                  start: Position(
+                    line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                    character:
+                      uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                  ),
+                  `end`: Position(
+                    line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                    character: uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                  ),
+                ),
+              )
+            # Handle multiple locations
+            if definitionNode.contains("locations"):
+              defc.locations = @[]
+              for locNode in definitionNode["locations"]:
+                let defContent = DefinitionContent(
+                  uri: locNode["uri"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                defc.locations.add(defContent)
+          scenario.definition = defc
+        else:
+          # Default definition config if not specified
+          scenario.definition = DefinitionConfig(
+            enabled: false,
+            location: DefinitionContent(
+              uri: "",
+              range: Range(
+                start: Position(line: 0, character: 0),
+                `end`: Position(line: 0, character: 0),
+              ),
+            ),
+            locations: @[],
+          )
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -443,6 +511,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
             declaration: delaysNode{"declaration"}.getInt(0),
+            definition: delaysNode{"definition"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -453,6 +522,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             semanticTokens: 0,
             inlayHint: 0,
             declaration: 0,
+            definition: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -611,6 +681,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "semanticTokens": 30,
             "inlayHint": 25,
             "declaration": 40,
+            "definition": 35,
           },
           "semanticTokens": {
             "enabled": true,
@@ -626,7 +697,64 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
             },
           },
-        }
+          "definition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///path/to/implementation.nim",
+              "range": {
+                "start": {"line": 25, "character": 2},
+                "end": {"line": 25, "character": 12},
+              },
+            },
+          },
+        },
+        "multi-location-testing": {
+          "name": "Multi-location Definition Testing",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false},
+          "diagnostics": {"enabled": false},
+          "semanticTokens": {"enabled": false},
+          "inlayHint": {"enabled": false},
+          "declaration": {
+            "enabled": true,
+            "locations": [
+              {
+                "uri": "file:///path/to/interface1.nim",
+                "range": {
+                  "start": {"line": 5, "character": 10},
+                  "end": {"line": 5, "character": 20},
+                },
+              },
+              {
+                "uri": "file:///path/to/interface2.nim",
+                "range": {
+                  "start": {"line": 8, "character": 2},
+                  "end": {"line": 8, "character": 12},
+                },
+              },
+            ],
+          },
+          "definition": {
+            "enabled": true,
+            "locations": [
+              {
+                "uri": "file:///path/to/implementation1.nim",
+                "range": {
+                  "start": {"line": 15, "character": 4},
+                  "end": {"line": 15, "character": 14},
+                },
+              },
+              {
+                "uri": "file:///path/to/implementation2.nim",
+                "range": {
+                  "start": {"line": 20, "character": 6},
+                  "end": {"line": 20, "character": 16},
+                },
+              },
+            ],
+          },
+          "delays": {},
+        },
       },
     }
 

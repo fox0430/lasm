@@ -50,6 +50,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/publishDiagnostics | |
 | textDocument/inlayHint | |
 | textDocument/declaration | |
+| textDocument/gotoDefinition | |
 | textDocument/shutdown | |
 
 ## Commands

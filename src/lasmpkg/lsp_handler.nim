@@ -84,6 +84,9 @@ proc handleInitialize*(
   # Set declaration provider
   serverCapabilities.declarationProvider = some(true)
 
+  # Set definition provider
+  serverCapabilities.definitionProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -778,6 +781,56 @@ proc handleDeclaration*(
       return %location
     else:
       # No declaration found
+      return newJNull()
+  else:
+    # Document not found
+    return newJNull()
+
+proc handleDefinition*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.definition > 0:
+    await sleepAsync(scenario.delays.definition.milliseconds)
+
+  # Check if definition is enabled
+  if not scenario.definition.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "definition" in scenario.errors:
+    let error = scenario.errors["definition"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create definition response from scenario configuration
+    if scenario.definition.locations.len > 0:
+      # Return array of locations
+      var locations: seq[JsonNode] = @[]
+      for loc in scenario.definition.locations:
+        let location = Location()
+        location.uri = loc.uri
+        location.range = loc.range
+        locations.add(%location)
+      return %locations
+    elif scenario.definition.location.uri != "":
+      # Return single location
+      let location = Location()
+      location.uri = scenario.definition.location.uri
+      location.range = scenario.definition.location.range
+      return %location
+    else:
+      # No definition found
       return newJNull()
   else:
     # Document not found
