@@ -185,6 +185,15 @@ proc handleReferences(server: LSPServer, id: JsonNode, params: JsonNode) {.async
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleDocumentHighlight(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleDocumentHighlight(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
   let params =
@@ -235,6 +244,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleImplementation(id, params)
   of "textDocument/references":
     await server.handleReferences(id, params)
+  of "textDocument/documentHighlight":
+    await server.handleDocumentHighlight(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

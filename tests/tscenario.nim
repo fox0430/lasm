@@ -2684,6 +2684,7 @@ suite "scenario module tests":
       typeDefinition: 60,
       implementation: 85,
       references: 95,
+      documentHighlight: 90,
     )
 
     check delayConfig.hover == 150
@@ -2696,3 +2697,235 @@ suite "scenario module tests":
     check delayConfig.typeDefinition == 60
     check delayConfig.implementation == 85
     check delayConfig.references == 95
+    check delayConfig.documentHighlight == 90
+
+  test "loadConfigFile with documentHighlight configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_document_highlight_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "highlight_test",
+        "scenarios": {
+          "highlight_test": {
+            "name": "Document Highlight Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references":
+              {"enabled": false, "locations": [], "includeDeclaration": true},
+            "documentHighlight": {
+              "enabled": true,
+              "highlights": [
+                {
+                  "range": {
+                    "start": {"line": 10, "character": 5},
+                    "end": {"line": 10, "character": 15},
+                  },
+                  "kind": 1,
+                },
+                {
+                  "range": {
+                    "start": {"line": 20, "character": 8},
+                    "end": {"line": 20, "character": 18},
+                  },
+                  "kind": 2,
+                },
+                {
+                  "range": {
+                    "start": {"line": 25, "character": 12},
+                    "end": {"line": 25, "character": 22},
+                  },
+                  "kind": 3,
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+              "documentHighlight": 45,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["highlight_test"]
+    check scenario.documentHighlight.enabled == true
+    check scenario.documentHighlight.highlights.len == 3
+
+    # Check first highlight
+    let highlight1 = scenario.documentHighlight.highlights[0]
+    check highlight1.range.start.line == 10
+    check highlight1.range.start.character == 5
+    check highlight1.range.`end`.line == 10
+    check highlight1.range.`end`.character == 15
+    check highlight1.kind.get == 1 # Text
+
+    # Check second highlight
+    let highlight2 = scenario.documentHighlight.highlights[1]
+    check highlight2.range.start.line == 20
+    check highlight2.range.start.character == 8
+    check highlight2.range.`end`.line == 20
+    check highlight2.range.`end`.character == 18
+    check highlight2.kind.get == 2 # Read
+
+    # Check third highlight
+    let highlight3 = scenario.documentHighlight.highlights[2]
+    check highlight3.range.start.line == 25
+    check highlight3.range.start.character == 12
+    check highlight3.range.`end`.line == 25
+    check highlight3.range.`end`.character == 22
+    check highlight3.kind.get == 3 # Write
+
+    check scenario.delays.documentHighlight == 45
+
+  test "loadConfigFile with disabled documentHighlight":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_document_highlight_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_highlight",
+        "scenarios": {
+          "no_highlight": {
+            "name": "No Document Highlight Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references":
+              {"enabled": false, "locations": [], "includeDeclaration": true},
+            "documentHighlight": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+              "documentHighlight": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_highlight"]
+    check scenario.documentHighlight.enabled == false
+    check scenario.documentHighlight.highlights.len == 0
+
+  test "loadConfigFile without documentHighlight configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_document_highlight_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_highlight_config",
+        "scenarios": {
+          "no_highlight_config": {
+            "name": "No Document Highlight Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references":
+              {"enabled": false, "locations": [], "includeDeclaration": true},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+              "documentHighlight": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_highlight_config"]
+    check scenario.documentHighlight.enabled == false
+    check scenario.documentHighlight.highlights.len == 0
+
+  test "DocumentHighlightConfig with optional kind":
+    let highlightConfig = DocumentHighlightConfig(
+      enabled: true,
+      highlights:
+        @[
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 5, character: 10),
+              `end`: Position(line: 5, character: 20),
+            ),
+            kind: none(int), # No kind specified
+          ),
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 10, character: 0),
+              `end`: Position(line: 10, character: 5),
+            ),
+            kind: some(2), # Read kind
+          ),
+        ],
+    )
+
+    check highlightConfig.enabled == true
+    check highlightConfig.highlights.len == 2
+    check highlightConfig.highlights[0].kind.isNone
+    check highlightConfig.highlights[1].kind.isSome
+    check highlightConfig.highlights[1].kind.get == 2

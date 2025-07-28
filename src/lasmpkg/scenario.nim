@@ -105,6 +105,14 @@ type
     locations*: seq[ReferenceContent]
     includeDeclaration*: bool
 
+  DocumentHighlightContent* = object
+    range*: Range
+    kind*: Option[int] # DocumentHighlightKind
+
+  DocumentHighlightConfig* = object
+    enabled*: bool
+    highlights*: seq[DocumentHighlightContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -116,6 +124,7 @@ type
     typeDefinition*: int
     implementation*: int
     references*: int
+    documentHighlight*: int
 
   ErrorConfig* = object
     code*: int
@@ -137,6 +146,7 @@ type
     typeDefinition*: TypeDefinitionConfig
     implementation*: ImplementationConfig
     references*: ReferenceConfig
+    documentHighlight*: DocumentHighlightConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -683,6 +693,43 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.references =
             ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true)
 
+        if scenarioData.hasKey("documentHighlight"):
+          # Load document highlight configuration
+          let documentHighlightNode = scenarioData["documentHighlight"]
+          var dhc = DocumentHighlightConfig(
+            enabled: documentHighlightNode["enabled"].getBool(false)
+          )
+          if dhc.enabled:
+            # Handle multiple highlights
+            if documentHighlightNode.contains("highlights"):
+              dhc.highlights = @[]
+              for highlightNode in documentHighlightNode["highlights"]:
+                let highlightContent = DocumentHighlightContent(
+                  range: Range(
+                    start: Position(
+                      line: uinteger(highlightNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(highlightNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(highlightNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(highlightNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                  kind:
+                    if highlightNode.hasKey("kind"):
+                      some(highlightNode["kind"].getInt())
+                    else:
+                      none(int),
+                )
+                dhc.highlights.add(highlightContent)
+          scenario.documentHighlight = dhc
+        else:
+          # Default document highlight config if not specified
+          scenario.documentHighlight =
+            DocumentHighlightConfig(enabled: false, highlights: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -697,6 +744,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             typeDefinition: delaysNode{"typeDefinition"}.getInt(0),
             implementation: delaysNode{"implementation"}.getInt(0),
             references: delaysNode{"references"}.getInt(0),
+            documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -711,6 +759,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             typeDefinition: 0,
             implementation: 0,
             references: 0,
+            documentHighlight: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -873,6 +922,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "typeDefinition": 30,
             "implementation": 35,
             "references": 50,
+            "documentHighlight": 45,
           },
           "semanticTokens": {
             "enabled": true,
@@ -935,6 +985,32 @@ proc createSampleConfig*(sm: ScenarioManager) =
                   "start": {"line": 42, "character": 12},
                   "end": {"line": 42, "character": 22},
                 },
+              },
+            ],
+          },
+          "documentHighlight": {
+            "enabled": true,
+            "highlights": [
+              {
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+                "kind": 1,
+              },
+              {
+                "range": {
+                  "start": {"line": 20, "character": 8},
+                  "end": {"line": 20, "character": 18},
+                },
+                "kind": 2,
+              },
+              {
+                "range": {
+                  "start": {"line": 25, "character": 12},
+                  "end": {"line": 25, "character": 22},
+                },
+                "kind": 3,
               },
             ],
           },
