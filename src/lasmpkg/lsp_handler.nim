@@ -93,6 +93,9 @@ proc handleInitialize*(
   # Set implementation provider
   serverCapabilities.implementationProvider = some(%true)
 
+  # Set references provider
+  serverCapabilities.referencesProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -941,3 +944,65 @@ proc handleImplementation*(
   else:
     # Document not found
     return newJNull()
+
+proc handleReferences*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.references > 0:
+    await sleepAsync(scenario.delays.references.milliseconds)
+
+  # Check if references is enabled
+  if not scenario.references.enabled:
+    return %(@[])
+
+  # Check for error injection
+  if "references" in scenario.errors:
+    let error = scenario.errors["references"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+  let context = params["context"]
+  let includeDeclaration = context["includeDeclaration"].getBool(true)
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create references response from scenario configuration
+    var locations: seq[JsonNode] = @[]
+
+    # Add configured reference locations
+    for refLoc in scenario.references.locations:
+      let location = Location()
+      location.uri = refLoc.uri
+      location.range = refLoc.range
+      locations.add(%location)
+
+    # If includeDeclaration is true and we have declaration info, add it
+    if includeDeclaration and scenario.references.includeDeclaration:
+      # Check if we have declaration configured in the scenario
+      if scenario.declaration.enabled:
+        if scenario.declaration.locations.len > 0:
+          # Add all declaration locations
+          for declLoc in scenario.declaration.locations:
+            let location = Location()
+            location.uri = declLoc.uri
+            location.range = declLoc.range
+            locations.add(%location)
+        elif scenario.declaration.location.uri != "":
+          # Add single declaration location
+          let location = Location()
+          location.uri = scenario.declaration.location.uri
+          location.range = scenario.declaration.location.range
+          locations.add(%location)
+
+    return %locations
+  else:
+    # Document not found, return empty array
+    return %(@[])
