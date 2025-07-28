@@ -2303,3 +2303,396 @@ suite "scenario module tests":
     check scenario.implementation.location.range.`end`.character == 10
     # locations should be empty since not specified
     check scenario.implementation.locations.len == 0
+
+  test "ReferenceContent initialization":
+    let referenceContent = ReferenceContent(
+      uri: "file:///test_reference.nim",
+      range: Range(
+        start: Position(line: 15, character: 8),
+        `end`: Position(line: 15, character: 18),
+      ),
+    )
+
+    check referenceContent.uri == "file:///test_reference.nim"
+    check referenceContent.range.start.line == 15
+    check referenceContent.range.start.character == 8
+    check referenceContent.range.`end`.line == 15
+    check referenceContent.range.`end`.character == 18
+
+  test "ReferenceConfig initialization":
+    let referenceContent1 = ReferenceContent(
+      uri: "file:///reference1.nim",
+      range: Range(
+        start: Position(line: 10, character: 5),
+        `end`: Position(line: 10, character: 15),
+      ),
+    )
+    let referenceContent2 = ReferenceContent(
+      uri: "file:///reference2.nim",
+      range: Range(
+        start: Position(line: 20, character: 3),
+        `end`: Position(line: 20, character: 13),
+      ),
+    )
+
+    let referenceConfig = ReferenceConfig(
+      enabled: true,
+      locations: @[referenceContent1, referenceContent2],
+      includeDeclaration: true,
+    )
+
+    check referenceConfig.enabled == true
+    check referenceConfig.includeDeclaration == true
+    check referenceConfig.locations.len == 2
+    check referenceConfig.locations[0].uri == "file:///reference1.nim"
+    check referenceConfig.locations[1].uri == "file:///reference2.nim"
+
+  test "loadConfigFile with references configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_references_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "references_test",
+        "scenarios": {
+          "references_test": {
+            "name": "References Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references": {
+              "enabled": true,
+              "includeDeclaration": true,
+              "locations": [
+                {
+                  "uri": "file:///reference1.nim",
+                  "range": {
+                    "start": {"line": 15, "character": 8},
+                    "end": {"line": 15, "character": 18},
+                  },
+                },
+                {
+                  "uri": "file:///reference2.nim",
+                  "range": {
+                    "start": {"line": 42, "character": 12},
+                    "end": {"line": 42, "character": 22},
+                  },
+                },
+                {
+                  "uri": "file:///reference3.nim",
+                  "range": {
+                    "start": {"line": 78, "character": 0},
+                    "end": {"line": 78, "character": 10},
+                  },
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 75,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "references_test"
+    check sm.scenarios.len == 1
+    check "references_test" in sm.scenarios
+
+    let scenario = sm.scenarios["references_test"]
+    check scenario.name == "References Test Scenario"
+    check scenario.references.enabled == true
+    check scenario.references.includeDeclaration == true
+    check scenario.delays.references == 75
+
+    # Check reference locations
+    check scenario.references.locations.len == 3
+    let ref1 = scenario.references.locations[0]
+    check ref1.uri == "file:///reference1.nim"
+    check ref1.range.start.line == 15
+    check ref1.range.start.character == 8
+    check ref1.range.`end`.line == 15
+    check ref1.range.`end`.character == 18
+
+    let ref2 = scenario.references.locations[1]
+    check ref2.uri == "file:///reference2.nim"
+    check ref2.range.start.line == 42
+    check ref2.range.start.character == 12
+    check ref2.range.`end`.line == 42
+    check ref2.range.`end`.character == 22
+
+    let ref3 = scenario.references.locations[2]
+    check ref3.uri == "file:///reference3.nim"
+    check ref3.range.start.line == 78
+    check ref3.range.start.character == 0
+    check ref3.range.`end`.line == 78
+    check ref3.range.`end`.character == 10
+
+  test "loadConfigFile with disabled references":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_disabled_references_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_references",
+        "scenarios": {
+          "no_references": {
+            "name": "No References Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_references"]
+    check scenario.references.enabled == false
+    check scenario.references.includeDeclaration == true # Default value
+    check scenario.references.locations.len == 0
+
+  test "loadConfigFile without references configuration creates default":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_references_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_ref_config",
+        "scenarios": {
+          "no_ref_config": {
+            "name": "No References Config Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_ref_config"]
+    check scenario.references.enabled == false
+    check scenario.references.includeDeclaration == true # Default value
+    check scenario.references.locations.len == 0
+
+  test "loadConfigFile with minimal references configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_minimal_references_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "minimal_ref",
+        "scenarios": {
+          "minimal_ref": {
+            "name": "Minimal References Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references": {
+              "enabled": true,
+              "locations": [
+                {
+                  "uri": "file:///minimal_ref.nim",
+                  "range": {
+                    "start": {"line": 5, "character": 0},
+                    "end": {"line": 5, "character": 10},
+                  },
+                }
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["minimal_ref"]
+    check scenario.references.enabled == true
+    check scenario.references.includeDeclaration == true # Default when not specified
+    check scenario.references.locations.len == 1
+    check scenario.references.locations[0].uri == "file:///minimal_ref.nim"
+    check scenario.references.locations[0].range.start.line == 5
+    check scenario.references.locations[0].range.start.character == 0
+    check scenario.references.locations[0].range.`end`.line == 5
+    check scenario.references.locations[0].range.`end`.character == 10
+
+  test "loadConfigFile with references and includeDeclaration false":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_references_no_decl_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "references_no_decl",
+        "scenarios": {
+          "references_no_decl": {
+            "name": "References Without Declaration Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "semanticTokens": {"enabled": false, "tokens": []},
+            "inlayHint": {"enabled": false, "hints": []},
+            "declaration": {"enabled": false},
+            "definition": {"enabled": false},
+            "typeDefinition": {"enabled": false},
+            "implementation": {"enabled": false},
+            "references": {
+              "enabled": true,
+              "includeDeclaration": false,
+              "locations": [
+                {
+                  "uri": "file:///reference_only.nim",
+                  "range": {
+                    "start": {"line": 10, "character": 5},
+                    "end": {"line": 10, "character": 15},
+                  },
+                }
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "inlayHint": 0,
+              "declaration": 0,
+              "definition": 0,
+              "typeDefinition": 0,
+              "implementation": 0,
+              "references": 0,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["references_no_decl"]
+    check scenario.references.enabled == true
+    check scenario.references.includeDeclaration == false
+    check scenario.references.locations.len == 1
+
+  test "DelayConfig with references field":
+    let delayConfig = DelayConfig(
+      hover: 150,
+      completion: 100,
+      diagnostics: 200,
+      semanticTokens: 75,
+      inlayHint: 50,
+      declaration: 80,
+      definition: 70,
+      typeDefinition: 60,
+      implementation: 85,
+      references: 95,
+    )
+
+    check delayConfig.hover == 150
+    check delayConfig.completion == 100
+    check delayConfig.diagnostics == 200
+    check delayConfig.semanticTokens == 75
+    check delayConfig.inlayHint == 50
+    check delayConfig.declaration == 80
+    check delayConfig.definition == 70
+    check delayConfig.typeDefinition == 60
+    check delayConfig.implementation == 85
+    check delayConfig.references == 95

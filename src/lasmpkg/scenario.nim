@@ -96,6 +96,15 @@ type
     location*: ImplementationContent
     locations*: seq[ImplementationContent]
 
+  ReferenceContent* = object
+    uri*: string
+    range*: Range
+
+  ReferenceConfig* = object
+    enabled*: bool
+    locations*: seq[ReferenceContent]
+    includeDeclaration*: bool
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -106,6 +115,7 @@ type
     definition*: int
     typeDefinition*: int
     implementation*: int
+    references*: int
 
   ErrorConfig* = object
     code*: int
@@ -126,6 +136,7 @@ type
     definition*: DefinitionConfig
     typeDefinition*: TypeDefinitionConfig
     implementation*: ImplementationConfig
+    references*: ReferenceConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -639,6 +650,39 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             locations: @[],
           )
 
+        if scenarioData.hasKey("references"):
+          # Load references configuration
+          let referencesNode = scenarioData["references"]
+          var rc = ReferenceConfig(enabled: referencesNode["enabled"].getBool(false))
+          # Set includeDeclaration regardless of enabled status (defaults to true)
+          rc.includeDeclaration = referencesNode{"includeDeclaration"}.getBool(true)
+          if rc.enabled:
+            # Handle multiple locations
+            if referencesNode.contains("locations"):
+              rc.locations = @[]
+              for locNode in referencesNode["locations"]:
+                let refContent = ReferenceContent(
+                  uri: locNode["uri"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(locNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(locNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(locNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                rc.locations.add(refContent)
+          scenario.references = rc
+        else:
+          # Default references config if not specified
+          scenario.references =
+            ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true)
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -652,6 +696,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             definition: delaysNode{"definition"}.getInt(0),
             typeDefinition: delaysNode{"typeDefinition"}.getInt(0),
             implementation: delaysNode{"implementation"}.getInt(0),
+            references: delaysNode{"references"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -665,6 +710,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             definition: 0,
             typeDefinition: 0,
             implementation: 0,
+            references: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -826,6 +872,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "definition": 35,
             "typeDefinition": 30,
             "implementation": 35,
+            "references": 50,
           },
           "semanticTokens": {
             "enabled": true,
@@ -870,6 +917,26 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "end": {"line": 30, "character": 20},
               },
             },
+          },
+          "references": {
+            "enabled": true,
+            "includeDeclaration": true,
+            "locations": [
+              {
+                "uri": "file:///path/to/reference1.nim",
+                "range": {
+                  "start": {"line": 15, "character": 8},
+                  "end": {"line": 15, "character": 18},
+                },
+              },
+              {
+                "uri": "file:///path/to/reference2.nim",
+                "range": {
+                  "start": {"line": 42, "character": 12},
+                  "end": {"line": 42, "character": 22},
+                },
+              },
+            ],
           },
         },
         "multi-location-testing": {
@@ -932,6 +999,33 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "range": {
                   "start": {"line": 30, "character": 2},
                   "end": {"line": 30, "character": 17},
+                },
+              },
+            ],
+          },
+          "references": {
+            "enabled": true,
+            "includeDeclaration": false,
+            "locations": [
+              {
+                "uri": "file:///path/to/multi-ref1.nim",
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+              },
+              {
+                "uri": "file:///path/to/multi-ref2.nim",
+                "range": {
+                  "start": {"line": 22, "character": 3},
+                  "end": {"line": 22, "character": 13},
+                },
+              },
+              {
+                "uri": "file:///path/to/multi-ref3.nim",
+                "range": {
+                  "start": {"line": 35, "character": 7},
+                  "end": {"line": 35, "character": 17},
                 },
               },
             ],
