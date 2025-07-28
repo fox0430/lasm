@@ -99,6 +99,9 @@ proc handleInitialize*(
   # Set document highlight provider
   serverCapabilities.documentHighlightProvider = some(true)
 
+  # Set rename provider
+  serverCapabilities.renameProvider = %true
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1053,3 +1056,76 @@ proc handleDocumentHighlight*(
   else:
     # Document not found, return empty array
     return %(@[])
+
+proc handleTextDocumentRename*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.rename > 0:
+    await sleepAsync(scenario.delays.rename.milliseconds)
+
+  # Check if rename is enabled
+  if not scenario.rename.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "rename" in scenario.errors:
+    let error = scenario.errors["rename"]
+    raise newException(LSPError, error.message)
+
+  # Extract position and new name information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+  let newName = params["newName"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create workspace edit response from scenario configuration
+    if scenario.rename.workspaceEdit.changes.len > 0 or
+        scenario.rename.workspaceEdit.documentChanges.len > 0:
+      let workspaceEdit = WorkspaceEdit()
+
+      # Handle changes (uri -> TextEdit[])
+      if scenario.rename.workspaceEdit.changes.len > 0:
+        var changesObj = newJObject()
+        for change in scenario.rename.workspaceEdit.changes:
+          var editsArray = newJArray()
+          for edit in change.edits:
+            let textEdit = TextEdit()
+            textEdit.range = edit.range
+            textEdit.newText = edit.newText.replace("${newName}", newName)
+            editsArray.add(%textEdit)
+          changesObj[change.uri] = editsArray
+        workspaceEdit.changes = some(%changesObj)
+
+      # Handle documentChanges
+      if scenario.rename.workspaceEdit.documentChanges.len > 0:
+        var docChanges: seq[TextDocumentEdit] = @[]
+        for docChange in scenario.rename.workspaceEdit.documentChanges:
+          let textDocEdit = TextDocumentEdit()
+          textDocEdit.textDocument = VersionedTextDocumentIdentifier()
+          textDocEdit.textDocument.uri = docChange.textDocument.uri
+          textDocEdit.textDocument.version = docChange.textDocument.version
+
+          var edits: seq[TextEdit] = @[]
+          for edit in docChange.edits:
+            let textEdit = TextEdit()
+            textEdit.range = edit.range
+            textEdit.newText = edit.newText.replace("${newName}", newName)
+            edits.add(textEdit)
+          textDocEdit.edits = some(edits)
+          docChanges.add(textDocEdit)
+        workspaceEdit.documentChanges = some(docChanges)
+
+      return %workspaceEdit
+    else:
+      # No rename edits configured
+      return newJNull()
+  else:
+    # Document not found
+    return newJNull()

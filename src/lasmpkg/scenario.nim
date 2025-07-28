@@ -113,6 +113,22 @@ type
     enabled*: bool
     highlights*: seq[DocumentHighlightContent]
 
+  RenameEditChange* = object
+    uri*: string
+    edits*: seq[TextEdit]
+
+  RenameDocumentChange* = object
+    textDocument*: VersionedTextDocumentIdentifier
+    edits*: seq[TextEdit]
+
+  RenameWorkspaceEdit* = object
+    changes*: seq[RenameEditChange]
+    documentChanges*: seq[RenameDocumentChange]
+
+  RenameConfig* = object
+    enabled*: bool
+    workspaceEdit*: RenameWorkspaceEdit
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -125,6 +141,7 @@ type
     implementation*: int
     references*: int
     documentHighlight*: int
+    rename*: int
 
   ErrorConfig* = object
     code*: int
@@ -147,6 +164,7 @@ type
     implementation*: ImplementationConfig
     references*: ReferenceConfig
     documentHighlight*: DocumentHighlightConfig
+    rename*: RenameConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -730,6 +748,76 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.documentHighlight =
             DocumentHighlightConfig(enabled: false, highlights: @[])
 
+        if scenarioData.hasKey("rename"):
+          # Load rename configuration
+          let renameNode = scenarioData["rename"]
+          var rc = RenameConfig(enabled: renameNode["enabled"].getBool(false))
+          if rc.enabled:
+            # Initialize workspace edit
+            rc.workspaceEdit = RenameWorkspaceEdit(changes: @[], documentChanges: @[])
+
+            # Handle changes
+            if renameNode.contains("workspaceEdit") and
+                renameNode["workspaceEdit"].contains("changes"):
+              for changeNode in renameNode["workspaceEdit"]["changes"]:
+                var change =
+                  RenameEditChange(uri: changeNode["uri"].getStr(""), edits: @[])
+                if changeNode.contains("edits"):
+                  for editNode in changeNode["edits"]:
+                    let textEdit = TextEdit()
+                    textEdit.newText = editNode["newText"].getStr("")
+                    textEdit.range = Range(
+                      start: Position(
+                        line: uinteger(editNode["range"]["start"]["line"].getInt(0)),
+                        character:
+                          uinteger(editNode["range"]["start"]["character"].getInt(0)),
+                      ),
+                      `end`: Position(
+                        line: uinteger(editNode["range"]["end"]["line"].getInt(0)),
+                        character:
+                          uinteger(editNode["range"]["end"]["character"].getInt(0)),
+                      ),
+                    )
+                    change.edits.add(textEdit)
+                rc.workspaceEdit.changes.add(change)
+
+            # Handle documentChanges
+            if renameNode.contains("workspaceEdit") and
+                renameNode["workspaceEdit"].contains("documentChanges"):
+              for docChangeNode in renameNode["workspaceEdit"]["documentChanges"]:
+                var docChange = RenameDocumentChange(edits: @[])
+                docChange.textDocument = VersionedTextDocumentIdentifier()
+                docChange.textDocument.uri =
+                  docChangeNode["textDocument"]["uri"].getStr("")
+                docChange.textDocument.version =
+                  some(%docChangeNode["textDocument"]["version"].getInt(1))
+
+                if docChangeNode.contains("edits"):
+                  for editNode in docChangeNode["edits"]:
+                    let textEdit = TextEdit()
+                    textEdit.newText = editNode["newText"].getStr("")
+                    textEdit.range = Range(
+                      start: Position(
+                        line: uinteger(editNode["range"]["start"]["line"].getInt(0)),
+                        character:
+                          uinteger(editNode["range"]["start"]["character"].getInt(0)),
+                      ),
+                      `end`: Position(
+                        line: uinteger(editNode["range"]["end"]["line"].getInt(0)),
+                        character:
+                          uinteger(editNode["range"]["end"]["character"].getInt(0)),
+                      ),
+                    )
+                    docChange.edits.add(textEdit)
+                rc.workspaceEdit.documentChanges.add(docChange)
+          scenario.rename = rc
+        else:
+          # Default rename config if not specified
+          scenario.rename = RenameConfig(
+            enabled: false,
+            workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+          )
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -745,6 +833,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             implementation: delaysNode{"implementation"}.getInt(0),
             references: delaysNode{"references"}.getInt(0),
             documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
+            rename: delaysNode{"rename"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -760,6 +849,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             implementation: 0,
             references: 0,
             documentHighlight: 0,
+            rename: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -923,6 +1013,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "implementation": 35,
             "references": 50,
             "documentHighlight": 45,
+            "rename": 60,
           },
           "semanticTokens": {
             "enabled": true,
@@ -1013,6 +1104,46 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "kind": 3,
               },
             ],
+          },
+          "rename": {
+            "enabled": true,
+            "workspaceEdit": {
+              "changes": [
+                {
+                  "uri": "file:///path/to/file.nim",
+                  "edits": [
+                    {
+                      "range": {
+                        "start": {"line": 5, "character": 10},
+                        "end": {"line": 5, "character": 18},
+                      },
+                      "newText": "${newName}",
+                    },
+                    {
+                      "range": {
+                        "start": {"line": 12, "character": 5},
+                        "end": {"line": 12, "character": 13},
+                      },
+                      "newText": "${newName}",
+                    },
+                  ],
+                }
+              ],
+              "documentChanges": [
+                {
+                  "textDocument": {"uri": "file:///path/to/other.nim", "version": 1},
+                  "edits": [
+                    {
+                      "range": {
+                        "start": {"line": 3, "character": 8},
+                        "end": {"line": 3, "character": 16},
+                      },
+                      "newText": "${newName}",
+                    }
+                  ],
+                }
+              ],
+            },
           },
         },
         "multi-location-testing": {
