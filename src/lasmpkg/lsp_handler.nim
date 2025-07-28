@@ -96,6 +96,9 @@ proc handleInitialize*(
   # Set references provider
   serverCapabilities.referencesProvider = some(true)
 
+  # Set document highlight provider
+  serverCapabilities.documentHighlightProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1003,6 +1006,50 @@ proc handleReferences*(
           locations.add(%location)
 
     return %locations
+  else:
+    # Document not found, return empty array
+    return %(@[])
+
+proc handleDocumentHighlight*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.documentHighlight > 0:
+    await sleepAsync(scenario.delays.documentHighlight.milliseconds)
+
+  # Check if document highlight is enabled
+  if not scenario.documentHighlight.enabled:
+    return %(@[])
+
+  # Check for error injection
+  if "documentHighlight" in scenario.errors:
+    let error = scenario.errors["documentHighlight"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let position = params["position"]
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create document highlights from scenario configuration
+    var highlights: seq[JsonNode] = @[]
+
+    for highlightContent in scenario.documentHighlight.highlights:
+      let highlight = DocumentHighlight()
+      highlight.range = highlightContent.range
+
+      if highlightContent.kind.isSome:
+        highlight.kind = highlightContent.kind
+
+      highlights.add(%highlight)
+
+    return %highlights
   else:
     # Document not found, return empty array
     return %(@[])

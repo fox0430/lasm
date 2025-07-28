@@ -60,6 +60,7 @@ proc createTestScenarioManager(): ScenarioManager =
       typeDefinition: 0,
       implementation: 0,
       references: 0,
+      documentHighlight: 0,
     ),
     implementation: ImplementationConfig(
       enabled: false,
@@ -73,6 +74,7 @@ proc createTestScenarioManager(): ScenarioManager =
     ),
     references:
       ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+    documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -287,6 +289,33 @@ proc createTestScenarioManager(): ScenarioManager =
           ),
         ],
     ),
+    documentHighlight: DocumentHighlightConfig(
+      enabled: true,
+      highlights:
+        @[
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 10, character: 5),
+              `end`: Position(line: 10, character: 15),
+            ),
+            kind: some(1), # Text
+          ),
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 20, character: 8),
+              `end`: Position(line: 20, character: 18),
+            ),
+            kind: some(2), # Read
+          ),
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 25, character: 12),
+              `end`: Position(line: 25, character: 22),
+            ),
+            kind: some(3), # Write
+          ),
+        ],
+    ),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -339,6 +368,7 @@ proc createTestScenarioManager(): ScenarioManager =
       typeDefinition: 0,
       implementation: 0,
       references: 0,
+      documentHighlight: 0,
     ),
     implementation: ImplementationConfig(
       enabled: true,
@@ -351,6 +381,7 @@ proc createTestScenarioManager(): ScenarioManager =
       locations: @[],
     ),
     references: ReferenceConfig(enabled: true, locations: @[], includeDeclaration: true),
+    documentHighlight: DocumentHighlightConfig(enabled: true, highlights: @[]),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
       "completion": ErrorConfig(code: -32602, message: "Completion error"),
@@ -362,6 +393,8 @@ proc createTestScenarioManager(): ScenarioManager =
       "typeDefinition": ErrorConfig(code: -32603, message: "Type definition error"),
       "implementation": ErrorConfig(code: -32603, message: "Implementation error"),
       "references": ErrorConfig(code: -32603, message: "References error"),
+      "documentHighlight":
+        ErrorConfig(code: -32603, message: "Document highlight error"),
     }.toTable,
   )
 
@@ -2423,3 +2456,201 @@ suite "lsp_handler module tests":
 
     check response.kind == JArray
     check response.len == 0
+
+  test "handleDocumentHighlight with enabled highlights":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has document highlights configured
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let response = waitFor handler.handleDocumentHighlight(%1, params)
+
+    check response.kind == JArray
+    check response.len == 3 # 3 highlights configured
+
+    # Check first highlight
+    let highlight1 = response[0]
+    check highlight1["range"]["start"]["line"].getInt() == 10
+    check highlight1["range"]["start"]["character"].getInt() == 5
+    check highlight1["range"]["end"]["line"].getInt() == 10
+    check highlight1["range"]["end"]["character"].getInt() == 15
+    check highlight1["kind"].getInt() == 1 # Text
+
+    # Check second highlight
+    let highlight2 = response[1]
+    check highlight2["range"]["start"]["line"].getInt() == 20
+    check highlight2["range"]["start"]["character"].getInt() == 8
+    check highlight2["range"]["end"]["line"].getInt() == 20
+    check highlight2["range"]["end"]["character"].getInt() == 18
+    check highlight2["kind"].getInt() == 2 # Read
+
+    # Check third highlight
+    let highlight3 = response[2]
+    check highlight3["range"]["start"]["line"].getInt() == 25
+    check highlight3["range"]["start"]["character"].getInt() == 12
+    check highlight3["range"]["end"]["line"].getInt() == 25
+    check highlight3["range"]["end"]["character"].getInt() == 22
+    check highlight3["kind"].getInt() == 3 # Write
+
+  test "handleDocumentHighlight with disabled highlights":
+    let sm = createTestScenarioManager()
+    # Use default scenario which has document highlights disabled
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleDocumentHighlight(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0 # Returns empty array when disabled
+
+  test "handleDocumentHighlight with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    expect LSPError:
+      discard waitFor handler.handleDocumentHighlight(%1, params)
+
+  test "handleDocumentHighlight with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim"},
+        "position": {"line": 0, "character": 0},
+      }
+
+    let response = waitFor handler.handleDocumentHighlight(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0 # Returns empty array for non-existent documents
+
+  test "handleDocumentHighlight with delay":
+    let sm = createTestScenarioManager()
+    # Create scenario with documentHighlight delay
+    sm.scenarios["highlight_delay"] = Scenario(
+      name: "Highlight Delay Test",
+      hover: HoverConfig(enabled: false),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      implementation: ImplementationConfig(
+        enabled: false,
+        location: ImplementationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      references:
+        ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+      documentHighlight: DocumentHighlightConfig(
+        enabled: true,
+        highlights:
+          @[
+            DocumentHighlightContent(
+              range: Range(
+                start: Position(line: 5, character: 10),
+                `end`: Position(line: 5, character: 20),
+              ),
+              kind: some(1),
+            )
+          ],
+      ),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+        implementation: 0,
+        references: 0,
+        documentHighlight: 50, # 50ms delay
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "highlight_delay"
+    let handler = newLSPHandler(sm)
+
+    # Add a document first
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "position": {"line": 0, "character": 5},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentHighlight(%1, params)
+    let endTime = getTime()
+
+    # Check that delay occurred
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 50 # Should have at least 50ms delay
+
+    check response.kind == JArray
+    check response.len == 1
