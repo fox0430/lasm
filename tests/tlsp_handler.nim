@@ -62,6 +62,7 @@ proc createTestScenarioManager(): ScenarioManager =
       references: 0,
       documentHighlight: 0,
       rename: 0,
+      formatting: 0,
     ),
     implementation: ImplementationConfig(
       enabled: false,
@@ -80,6 +81,7 @@ proc createTestScenarioManager(): ScenarioManager =
       enabled: false,
       workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
     ),
+    formatting: FormattingConfig(enabled: false, edits: @[]),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -375,6 +377,7 @@ proc createTestScenarioManager(): ScenarioManager =
       references: 0,
       documentHighlight: 0,
       rename: 0,
+      formatting: 0,
     ),
     implementation: ImplementationConfig(
       enabled: true,

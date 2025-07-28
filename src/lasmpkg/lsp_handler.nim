@@ -102,6 +102,9 @@ proc handleInitialize*(
   # Set rename provider
   serverCapabilities.renameProvider = %true
 
+  # Set document formatting provider
+  serverCapabilities.documentFormattingProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1129,3 +1132,48 @@ proc handleTextDocumentRename*(
   else:
     # Document not found
     return newJNull()
+
+proc handleDocumentFormatting*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.formatting > 0:
+    await sleepAsync(scenario.delays.formatting.milliseconds)
+
+  # Check if formatting is enabled
+  if not scenario.formatting.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "formatting" in scenario.errors:
+    let error = scenario.errors["formatting"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+  let options =
+    if params.hasKey("options"):
+      params["options"]
+    else:
+      newJObject()
+
+  # Get document content if available
+  if uri in handler.documents:
+    let doc = handler.documents[uri]
+
+    # Create formatting response from scenario configuration
+    var edits: seq[JsonNode] = @[]
+
+    for editContent in scenario.formatting.edits:
+      let textEdit = TextEdit()
+      textEdit.range = editContent.range
+      textEdit.newText = editContent.newText
+      edits.add(%textEdit)
+
+    return %edits
+  else:
+    # Document not found, return empty edits
+    return %(@[])
