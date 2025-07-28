@@ -61,6 +61,7 @@ proc createTestScenarioManager(): ScenarioManager =
       implementation: 0,
       references: 0,
       documentHighlight: 0,
+      rename: 0,
     ),
     implementation: ImplementationConfig(
       enabled: false,
@@ -75,6 +76,10 @@ proc createTestScenarioManager(): ScenarioManager =
     references:
       ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
     documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
+    rename: RenameConfig(
+      enabled: false,
+      workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+    ),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -369,6 +374,7 @@ proc createTestScenarioManager(): ScenarioManager =
       implementation: 0,
       references: 0,
       documentHighlight: 0,
+      rename: 0,
     ),
     implementation: ImplementationConfig(
       enabled: true,
@@ -2628,6 +2634,7 @@ suite "lsp_handler module tests":
         implementation: 0,
         references: 0,
         documentHighlight: 50, # 50ms delay
+        rename: 30, # 30ms delay
       ),
       errors: initTable[string, ErrorConfig](),
     )

@@ -194,6 +194,15 @@ proc handleDocumentHighlight(
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleTextDocumentRename(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleTextDocumentRename(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
   let params =
@@ -246,6 +255,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleReferences(id, params)
   of "textDocument/documentHighlight":
     await server.handleDocumentHighlight(id, params)
+  of "textDocument/rename":
+    await server.handleTextDocumentRename(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

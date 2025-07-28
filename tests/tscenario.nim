@@ -2685,6 +2685,7 @@ suite "scenario module tests":
       implementation: 85,
       references: 95,
       documentHighlight: 90,
+      rename: 80,
     )
 
     check delayConfig.hover == 150
