@@ -2930,3 +2930,155 @@ suite "scenario module tests":
     check highlightConfig.highlights[0].kind.isNone
     check highlightConfig.highlights[1].kind.isSome
     check highlightConfig.highlights[1].kind.get == 2
+
+  test "FormattingConfig initialization":
+    let formattingConfig = FormattingConfig(enabled: true, edits: @[])
+    check formattingConfig.enabled == true
+    check formattingConfig.edits.len == 0
+
+  test "FormattingContent creation":
+    let formattingContent = FormattingContent(
+      range: Range(
+        start: Position(line: 1, character: 0), `end`: Position(line: 1, character: 10)
+      ),
+      newText: "formatted text",
+    )
+    check formattingContent.newText == "formatted text"
+    check formattingContent.range.start.line == 1
+    check formattingContent.range.start.character == 0
+    check formattingContent.range.`end`.line == 1
+    check formattingContent.range.`end`.character == 10
+
+  test "loadConfigFile with formatting configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_formatting_config.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "formatting_test",
+        "scenarios": {
+          "formatting_test": {
+            "name": "Formatting Test Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "formatting": {
+              "enabled": true,
+              "edits": [
+                {
+                  "range": {
+                    "start": {"line": 1, "character": 0},
+                    "end": {"line": 1, "character": 20},
+                  },
+                  "newText": "function formattedFunction() {",
+                },
+                {
+                  "range": {
+                    "start": {"line": 5, "character": 2},
+                    "end": {"line": 5, "character": 10},
+                  },
+                  "newText": "    return;",
+                },
+              ],
+            },
+            "delays": {
+              "hover": 0,
+              "completion": 0,
+              "diagnostics": 0,
+              "semanticTokens": 0,
+              "formatting": 50,
+            },
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "formatting_test"
+
+    let scenario = sm.scenarios["formatting_test"]
+    check scenario.formatting.enabled == true
+    check scenario.formatting.edits.len == 2
+    check scenario.delays.formatting == 50
+
+    # Check first edit
+    let firstEdit = scenario.formatting.edits[0]
+    check firstEdit.newText == "function formattedFunction() {"
+    check firstEdit.range.start.line == 1
+    check firstEdit.range.start.character == 0
+    check firstEdit.range.`end`.line == 1
+    check firstEdit.range.`end`.character == 20
+
+    # Check second edit
+    let secondEdit = scenario.formatting.edits[1]
+    check secondEdit.newText == "    return;"
+    check secondEdit.range.start.line == 5
+    check secondEdit.range.start.character == 2
+
+  test "loadConfigFile with formatting disabled":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_formatting_disabled.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "formatting_disabled",
+        "scenarios": {
+          "formatting_disabled": {
+            "name": "Formatting Disabled Scenario",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+            "formatting": {"enabled": false},
+            "delays": {"formatting": 0},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["formatting_disabled"]
+    check scenario.formatting.enabled == false
+    check scenario.formatting.edits.len == 0
+    check scenario.delays.formatting == 0
+
+  test "loadConfigFile without formatting section uses defaults":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_formatting.json"
+
+    let testConfig =
+      %*{
+        "currentScenario": "no_formatting",
+        "scenarios": {
+          "no_formatting": {
+            "name": "No Formatting Config",
+            "hover": {"enabled": false},
+            "completion": {"enabled": false, "items": []},
+            "diagnostics": {"enabled": false, "diagnostics": []},
+          }
+        },
+      }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_formatting"]
+    # Should have default formatting config
+    check scenario.formatting.enabled == false
+    check scenario.formatting.edits.len == 0
+    check scenario.delays.formatting == 0

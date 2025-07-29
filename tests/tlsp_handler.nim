@@ -62,6 +62,7 @@ proc createTestScenarioManager(): ScenarioManager =
       references: 0,
       documentHighlight: 0,
       rename: 0,
+      formatting: 0,
     ),
     implementation: ImplementationConfig(
       enabled: false,
@@ -80,6 +81,7 @@ proc createTestScenarioManager(): ScenarioManager =
       enabled: false,
       workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
     ),
+    formatting: FormattingConfig(enabled: false, edits: @[]),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -375,6 +377,7 @@ proc createTestScenarioManager(): ScenarioManager =
       references: 0,
       documentHighlight: 0,
       rename: 0,
+      formatting: 0,
     ),
     implementation: ImplementationConfig(
       enabled: true,
@@ -2661,3 +2664,476 @@ suite "lsp_handler module tests":
 
     check response.kind == JArray
     check response.len == 1
+
+  test "handleDocumentFormatting with disabled formatting":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # formatting disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "options": {"tabSize": 4, "insertSpaces": true},
+      }
+
+    let response = waitFor handler.handleDocumentFormatting(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentFormatting with enabled formatting":
+    let scenarioManager = createTestScenarioManager()
+
+    # Add a formatting-enabled scenario
+    scenarioManager.scenarios["formatting_test"] = Scenario(
+      name: "Formatting Test",
+      hover: HoverConfig(enabled: false, content: none(HoverContent), contents: @[]),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      implementation: ImplementationConfig(
+        enabled: false,
+        location: ImplementationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      references:
+        ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+      documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
+      rename: RenameConfig(
+        enabled: false,
+        workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+      ),
+      formatting: FormattingConfig(
+        enabled: true,
+        edits:
+          @[
+            FormattingContent(
+              range: Range(
+                start: Position(line: 1, character: 0),
+                `end`: Position(line: 1, character: 20),
+              ),
+              newText: "function formattedFunction() {",
+            ),
+            FormattingContent(
+              range: Range(
+                start: Position(line: 5, character: 2),
+                `end`: Position(line: 5, character: 10),
+              ),
+              newText: "    return;",
+            ),
+          ],
+      ),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+        implementation: 0,
+        references: 0,
+        documentHighlight: 0,
+        rename: 0,
+        formatting: 0,
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+
+    discard scenarioManager.setScenario("formatting_test")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "options": {"tabSize": 4, "insertSpaces": true},
+      }
+
+    let response = waitFor handler.handleDocumentFormatting(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    # Check first edit
+    let firstEdit = response[0]
+    check firstEdit["newText"].getStr() == "function formattedFunction() {"
+    check firstEdit["range"]["start"]["line"].getInt() == 1
+    check firstEdit["range"]["start"]["character"].getInt() == 0
+    check firstEdit["range"]["end"]["line"].getInt() == 1
+    check firstEdit["range"]["end"]["character"].getInt() == 20
+
+    # Check second edit
+    let secondEdit = response[1]
+    check secondEdit["newText"].getStr() == "    return;"
+    check secondEdit["range"]["start"]["line"].getInt() == 5
+    check secondEdit["range"]["start"]["character"].getInt() == 2
+    check secondEdit["range"]["end"]["line"].getInt() == 5
+    check secondEdit["range"]["end"]["character"].getInt() == 10
+
+  test "handleDocumentFormatting with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    # Add a formatting-enabled scenario
+    scenarioManager.scenarios["formatting_test"] = Scenario(
+      name: "Formatting Test",
+      hover: HoverConfig(enabled: false, content: none(HoverContent), contents: @[]),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      implementation: ImplementationConfig(
+        enabled: false,
+        location: ImplementationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      references:
+        ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+      documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
+      rename: RenameConfig(
+        enabled: false,
+        workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+      ),
+      formatting: FormattingConfig(enabled: true, edits: @[]),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+        implementation: 0,
+        references: 0,
+        documentHighlight: 0,
+        rename: 0,
+        formatting: 0,
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+
+    discard scenarioManager.setScenario("formatting_test")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Don't add the document to handler.documents
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///unknown.nim"},
+        "options": {"tabSize": 4, "insertSpaces": true},
+      }
+
+    let response = waitFor handler.handleDocumentFormatting(%1, params)
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleDocumentFormatting with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    # Add a formatting scenario with delay
+    scenarioManager.scenarios["formatting_delay"] = Scenario(
+      name: "Formatting Delay Test",
+      hover: HoverConfig(enabled: false, content: none(HoverContent), contents: @[]),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      implementation: ImplementationConfig(
+        enabled: false,
+        location: ImplementationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      references:
+        ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+      documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
+      rename: RenameConfig(
+        enabled: false,
+        workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+      ),
+      formatting: FormattingConfig(
+        enabled: true,
+        edits:
+          @[
+            FormattingContent(
+              range: Range(
+                start: Position(line: 0, character: 0),
+                `end`: Position(line: 0, character: 5),
+              ),
+              newText: "hello",
+            )
+          ],
+      ),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+        implementation: 0,
+        references: 0,
+        documentHighlight: 0,
+        rename: 0,
+        formatting: 100,
+      ),
+      errors: initTable[string, ErrorConfig](),
+    )
+
+    discard scenarioManager.setScenario("formatting_delay")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "options": {"tabSize": 4, "insertSpaces": true},
+      }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentFormatting(%1, params)
+    let endTime = getTime()
+
+    # Check that delay occurred
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95 # Should have at least 100ms delay (with some tolerance)
+
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleDocumentFormatting with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    # Add a formatting scenario with error
+    scenarioManager.scenarios["formatting_error"] = Scenario(
+      name: "Formatting Error Test",
+      hover: HoverConfig(enabled: false, content: none(HoverContent), contents: @[]),
+      completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
+      diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
+      semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
+      inlayHint: InlayHintConfig(enabled: false, hints: @[]),
+      declaration: DeclarationConfig(
+        enabled: false,
+        location: DeclarationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      definition: DefinitionConfig(
+        enabled: false,
+        location: DefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      typeDefinition: TypeDefinitionConfig(
+        enabled: false,
+        location: TypeDefinitionContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      implementation: ImplementationConfig(
+        enabled: false,
+        location: ImplementationContent(
+          uri: "",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 0),
+          ),
+        ),
+        locations: @[],
+      ),
+      references:
+        ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
+      documentHighlight: DocumentHighlightConfig(enabled: false, highlights: @[]),
+      rename: RenameConfig(
+        enabled: false,
+        workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
+      ),
+      formatting: FormattingConfig(enabled: true, edits: @[]),
+      delays: DelayConfig(
+        hover: 0,
+        completion: 0,
+        diagnostics: 0,
+        semanticTokens: 0,
+        inlayHint: 0,
+        declaration: 0,
+        definition: 0,
+        typeDefinition: 0,
+        implementation: 0,
+        references: 0,
+        documentHighlight: 0,
+        rename: 0,
+        formatting: 0,
+      ),
+      errors: {"formatting": ErrorConfig(code: -32603, message: "Formatting failed")}.toTable(),
+    )
+
+    discard scenarioManager.setScenario("formatting_error")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///test.nim"},
+        "options": {"tabSize": 4, "insertSpaces": true},
+      }
+
+    expect(LSPError):
+      discard waitFor handler.handleDocumentFormatting(%1, params)
+
+  test "formatting capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentFormattingProvider")
+    check response["capabilities"]["documentFormattingProvider"].getBool() == true

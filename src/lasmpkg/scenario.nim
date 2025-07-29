@@ -129,6 +129,14 @@ type
     enabled*: bool
     workspaceEdit*: RenameWorkspaceEdit
 
+  FormattingContent* = object
+    range*: Range
+    newText*: string
+
+  FormattingConfig* = object
+    enabled*: bool
+    edits*: seq[FormattingContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -142,6 +150,7 @@ type
     references*: int
     documentHighlight*: int
     rename*: int
+    formatting*: int
 
   ErrorConfig* = object
     code*: int
@@ -165,6 +174,7 @@ type
     references*: ReferenceConfig
     documentHighlight*: DocumentHighlightConfig
     rename*: RenameConfig
+    formatting*: FormattingConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -818,6 +828,36 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
           )
 
+        if scenarioData.hasKey("formatting"):
+          # Load formatting configuration
+          let formattingNode = scenarioData["formatting"]
+          var fc = FormattingConfig(enabled: formattingNode["enabled"].getBool(false))
+          if fc.enabled:
+            # Handle edits
+            if formattingNode.contains("edits"):
+              fc.edits = @[]
+              for editNode in formattingNode["edits"]:
+                let formattingContent = FormattingContent(
+                  newText: editNode["newText"].getStr(""),
+                  range: Range(
+                    start: Position(
+                      line: uinteger(editNode["range"]["start"]["line"].getInt(0)),
+                      character:
+                        uinteger(editNode["range"]["start"]["character"].getInt(0)),
+                    ),
+                    `end`: Position(
+                      line: uinteger(editNode["range"]["end"]["line"].getInt(0)),
+                      character:
+                        uinteger(editNode["range"]["end"]["character"].getInt(0)),
+                    ),
+                  ),
+                )
+                fc.edits.add(formattingContent)
+          scenario.formatting = fc
+        else:
+          # Default formatting config if not specified
+          scenario.formatting = FormattingConfig(enabled: false, edits: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -834,6 +874,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             references: delaysNode{"references"}.getInt(0),
             documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
             rename: delaysNode{"rename"}.getInt(0),
+            formatting: delaysNode{"formatting"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -850,6 +891,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             references: 0,
             documentHighlight: 0,
             rename: 0,
+            formatting: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -1014,6 +1056,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
             "references": 50,
             "documentHighlight": 45,
             "rename": 60,
+            "formatting": 40,
           },
           "semanticTokens": {
             "enabled": true,
@@ -1144,6 +1187,25 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 }
               ],
             },
+          },
+          "formatting": {
+            "enabled": true,
+            "edits": [
+              {
+                "range": {
+                  "start": {"line": 1, "character": 0},
+                  "end": {"line": 1, "character": 20},
+                },
+                "newText": "function formattedFunction() {",
+              },
+              {
+                "range": {
+                  "start": {"line": 5, "character": 2},
+                  "end": {"line": 5, "character": 10},
+                },
+                "newText": "    return;",
+              },
+            ],
           },
         },
         "multi-location-testing": {
