@@ -74,7 +74,8 @@ proc parseCliParams*(): AppConfig =
         result.configPath = paramStr(i + 1)
         inc i
       else:
-        return
+        writeNoConfigError()
+        quit(1)
     of "-h", "--help":
       writeUsage()
       quit(0)
