@@ -77,6 +77,7 @@ proc parseCliParams*(): AppConfig =
       quit(0)
     of "-v", "--version":
       writeVersion()
+      quit(0)
     else:
       unknownOptionError(param)
       quit(1)
