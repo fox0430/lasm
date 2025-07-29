@@ -54,6 +54,9 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/typeDefinition | |
 | textDocument/implementation | |
 | textDocument/references | |
+| textDocument/documentHighlight | |
+| textDocument/rename | |
+| textDocument/formatting | |
 | textDocument/shutdown | |
 
 ## Commands
