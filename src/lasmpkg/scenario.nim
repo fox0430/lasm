@@ -921,14 +921,10 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
 proc newScenarioManager*(configPath: string = ""): ScenarioManager =
   result = ScenarioManager()
   result.currentScenario = "default"
-  result.configPath =
-    if configPath == "":
-      getCurrentDir() / "lsp-test-config.json"
-    else:
-      configPath
+  result.configPath = configPath
+
   if not result.loadConfigFile(result.configPath):
-    logError("Failed to load configuration file, exiting: " & result.configPath)
-    quit(1)
+    logInfo("Start without a configuration file")
 
 proc getCurrentScenario*(sm: ScenarioManager): Scenario =
   if sm.currentScenario in sm.scenarios:

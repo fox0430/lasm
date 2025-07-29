@@ -54,10 +54,6 @@ proc unknownOptionError(s: string) =
   writeUsage(true)
 
 proc parseCliParams*(): AppConfig =
-  if paramCount() == 0:
-    writeNoConfigError()
-    quit(1)
-
   # Parse command line arguments
   var i = 1
   while i <= paramCount():
