@@ -184,11 +184,12 @@ type
     configPath*: string
 
 proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
-  let actualPath =
-    if configPath == "":
-      getCurrentDir() / "lsp-test-config.json"
-    else:
-      configPath
+  # If configPath is empty, don't try to load any file
+  if configPath == "":
+    logInfo("No configuration file specified, using empty default scenario")
+    return false
+
+  let actualPath = configPath
 
   logInfo("Loading configuration file: " & actualPath)
 
@@ -918,6 +919,27 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
     logError("Error loading configuration from: " & actualPath & " - " & e.msg)
     return false
 
+proc createEmptyScenario*(name: string = "default"): Scenario =
+  ## Creates an empty scenario with all features disabled
+  result = Scenario(
+    name: name,
+    hover: HoverConfig(enabled: false),
+    completion: CompletionConfig(enabled: false),
+    diagnostics: DiagnosticConfig(enabled: false),
+    semanticTokens: SemanticTokensConfig(enabled: false),
+    inlayHint: InlayHintConfig(enabled: false),
+    declaration: DeclarationConfig(enabled: false),
+    definition: DefinitionConfig(enabled: false),
+    typeDefinition: TypeDefinitionConfig(enabled: false),
+    implementation: ImplementationConfig(enabled: false),
+    references: ReferenceConfig(enabled: false),
+    documentHighlight: DocumentHighlightConfig(enabled: false),
+    rename: RenameConfig(enabled: false),
+    formatting: FormattingConfig(enabled: false),
+    delays: DelayConfig(),
+    errors: initTable[string, ErrorConfig](),
+  )
+
 proc newScenarioManager*(configPath: string = ""): ScenarioManager =
   result = ScenarioManager()
   result.currentScenario = "default"
@@ -925,6 +947,8 @@ proc newScenarioManager*(configPath: string = ""): ScenarioManager =
 
   if not result.loadConfigFile(result.configPath):
     logInfo("Start without a configuration file")
+    # Create an empty default scenario with all features disabled
+    result.scenarios["default"] = createEmptyScenario("default")
 
 proc getCurrentScenario*(sm: ScenarioManager): Scenario =
   if sm.currentScenario in sm.scenarios:
