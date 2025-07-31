@@ -292,7 +292,7 @@ suite "Cancellable request handlers tests":
 
     # Cancel by different ID types (may succeed or fail depending on timing)
     discard server.cancelRequest(numericId)
-    discard server.cancelRequest(stringId) 
+    discard server.cancelRequest(stringId)
     discard server.cancelRequest(floatId)
 
     # Wait for completion

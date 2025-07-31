@@ -135,7 +135,7 @@ template withCancellationSupport*(
       requestFuture.fail(newException(CatchableError, e.msg))
     finally:
       server.removePendingRequest(id)
-  
+
   # Start the work asynchronously
   await doWork()
 
@@ -207,7 +207,7 @@ proc handleHover*(server: LSPServer, id: JsonNode, params: JsonNode): Future[voi
   # Add to pending requests immediately (synchronously) when called
   let requestFuture = newFuture[void]("handleHover")
   server.addPendingRequest(id, requestFuture)
-  
+
   # Start the async implementation and handle cleanup asynchronously
   proc asyncWrapper() {.async.} =
     try:
@@ -217,10 +217,10 @@ proc handleHover*(server: LSPServer, id: JsonNode, params: JsonNode): Future[voi
       requestFuture.fail(newException(CatchableError, e.msg))
     finally:
       server.removePendingRequest(id)
-  
+
   # Start the wrapper
   asyncSpawn asyncWrapper()
-  
+
   return requestFuture
 
 proc handleCompletionImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
@@ -243,10 +243,12 @@ proc handleCompletionImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.a
   except Exception as e:
     await server.sendError(-32603, "Internal error: " & e.msg, id)
 
-proc handleCompletion*(server: LSPServer, id: JsonNode, params: JsonNode): Future[void] =
+proc handleCompletion*(
+    server: LSPServer, id: JsonNode, params: JsonNode
+): Future[void] =
   let requestFuture = newFuture[void]("handleCompletion")
   server.addPendingRequest(id, requestFuture)
-  
+
   proc asyncWrapper() {.async.} =
     try:
       await server.handleCompletionImpl(id, params)
@@ -255,11 +257,13 @@ proc handleCompletion*(server: LSPServer, id: JsonNode, params: JsonNode): Futur
       requestFuture.fail(newException(CatchableError, e.msg))
     finally:
       server.removePendingRequest(id)
-  
+
   asyncSpawn asyncWrapper()
   return requestFuture
 
-proc handleSemanticTokensFullImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+proc handleSemanticTokensFullImpl(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
   try:
     if server.isRequestCancelled(id):
       await server.sendError(-32800, "Request was cancelled", id)
@@ -284,7 +288,7 @@ proc handleSemanticTokensFull*(
 ): Future[void] =
   let requestFuture = newFuture[void]("handleSemanticTokensFull")
   server.addPendingRequest(id, requestFuture)
-  
+
   proc asyncWrapper() {.async.} =
     try:
       await server.handleSemanticTokensFullImpl(id, params)
@@ -293,7 +297,7 @@ proc handleSemanticTokensFull*(
       requestFuture.fail(newException(CatchableError, e.msg))
     finally:
       server.removePendingRequest(id)
-  
+
   asyncSpawn asyncWrapper()
   return requestFuture
 
@@ -338,10 +342,12 @@ proc handleDefinitionImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.a
   except Exception as e:
     await server.sendError(-32603, "Internal error: " & e.msg, id)
 
-proc handleDefinition*(server: LSPServer, id: JsonNode, params: JsonNode): Future[void] =
+proc handleDefinition*(
+    server: LSPServer, id: JsonNode, params: JsonNode
+): Future[void] =
   let requestFuture = newFuture[void]("handleDefinition")
   server.addPendingRequest(id, requestFuture)
-  
+
   proc asyncWrapper() {.async.} =
     try:
       await server.handleDefinitionImpl(id, params)
@@ -350,7 +356,7 @@ proc handleDefinition*(server: LSPServer, id: JsonNode, params: JsonNode): Futur
       requestFuture.fail(newException(CatchableError, e.msg))
     finally:
       server.removePendingRequest(id)
-  
+
   asyncSpawn asyncWrapper()
   return requestFuture
 
