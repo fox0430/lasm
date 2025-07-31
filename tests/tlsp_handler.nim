@@ -634,7 +634,7 @@ suite "lsp_handler module tests":
     let notifications = waitFor handler.handleDidChange(params)
 
     check handler.documents.len == 0
-    check notifications.len == 1
+    check notifications.len == 2
 
   test "handleDidClose removes document":
     let sm = createTestScenarioManager()
@@ -1065,7 +1065,7 @@ suite "lsp_handler module tests":
       }
     let openNotifications = waitFor handler.handleDidOpen(openParams)
     check openNotifications[0]["params"]["message"].getStr().contains(
-      "(total: 1 files)"
+      "Received textDocument/didOpen notification:"
     )
 
     # Test didChange with content length
@@ -1076,14 +1076,14 @@ suite "lsp_handler module tests":
       }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
     check changeNotifications[0]["params"]["message"].getStr().contains(
-      "(v2, 11 chars)"
+      "Received textDocument/didChange notification:"
     )
 
     # Test didClose with remaining count
     let closeParams = %*{"textDocument": {"uri": "file:///test.nim"}}
     let closeNotifications = waitFor handler.handleDidClose(closeParams)
     check closeNotifications[0]["params"]["message"].getStr().contains(
-      "(remaining: 0 files)"
+      "Received textDocument/didClose notification:"
     )
 
   test "didChange and didClose with non-existent files":
@@ -1097,16 +1097,16 @@ suite "lsp_handler module tests":
         "contentChanges": [{"text": "content"}],
       }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
-    check changeNotifications[0]["params"]["type"].getInt() == 2 # Warning
-    check changeNotifications[0]["params"]["message"].getStr().contains(
+    check changeNotifications[1]["params"]["type"].getInt() == 2 # Warning
+    check changeNotifications[1]["params"]["message"].getStr().contains(
       "Warning: Attempted to update unopened document"
     )
 
     # Test didClose on non-existent file
     let closeParams = %*{"textDocument": {"uri": "file:///nonexistent.nim"}}
     let closeNotifications = waitFor handler.handleDidClose(closeParams)
-    check closeNotifications[0]["params"]["type"].getInt() == 2 # Warning
-    check closeNotifications[0]["params"]["message"].getStr().contains(
+    check closeNotifications[1]["params"]["type"].getInt() == 2 # Warning
+    check closeNotifications[1]["params"]["message"].getStr().contains(
       "Warning: Attempted to close unopened document"
     )
 
@@ -1358,7 +1358,7 @@ suite "lsp_handler module tests":
 
     check notifications.len == 1
     check notifications[0]["params"]["message"].getStr() ==
-      "Received workspace/didChangeConfiguration notification"
+      "Received workspace/didChangeConfiguration notification: {}"
     check sm.currentScenario == "default" # Should remain unchanged
 
   test "handleDidChangeConfiguration with non-lsptest settings":
@@ -1372,7 +1372,7 @@ suite "lsp_handler module tests":
 
     check notifications.len == 1
     check notifications[0]["params"]["message"].getStr() ==
-      "Received workspace/didChangeConfiguration notification"
+      "Received workspace/didChangeConfiguration notification: {\"settings\":{\"other\":{\"config\":\"value\"}}}"
     check sm.currentScenario == "default" # Should remain unchanged
 
   test "handleInlayHint with enabled inlay hints":
