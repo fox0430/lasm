@@ -7,15 +7,23 @@ import protocol/types
 
 export tables, scenario
 
-type LSPServer* = ref object
-  transport*: Transport
-  lspHandler*: LSPHandler
+type
+  PendingRequest* = ref object
+    id*: JsonNode
+    future*: Future[void]
+    cancelled*: bool
+
+  LSPServer* = ref object
+    transport*: Transport
+    lspHandler*: LSPHandler
+    pendingRequests*: Table[string, PendingRequest]
 
 proc newLSPServer*(configPath: string = "", transport: Transport = nil): LSPServer =
   ## LSP Server Implementation
   logInfo("Creating new LSP server with config: " & configPath)
 
   result = LSPServer()
+  result.pendingRequests = initTable[string, PendingRequest]()
 
   # Use provided transport or create default stdio transport
   if transport == nil:
@@ -67,6 +75,59 @@ proc sendNotification*(
   let notification = %*{"jsonrpc": "2.0", "method": methodName, "params": params}
   await server.sendMessage(notification)
 
+proc addPendingRequest*(server: LSPServer, id: JsonNode, future: Future[void]) =
+  let requestId = $id
+  let pendingRequest = PendingRequest(id: id, future: future, cancelled: false)
+  server.pendingRequests[requestId] = pendingRequest
+
+proc removePendingRequest*(server: LSPServer, id: JsonNode) =
+  let requestId = $id
+  server.pendingRequests.del(requestId)
+
+proc cancelRequest*(server: LSPServer, id: JsonNode): bool =
+  let requestId = $id
+  if requestId in server.pendingRequests:
+    let pendingRequest = server.pendingRequests[requestId]
+    pendingRequest.cancelled = true
+    if not pendingRequest.future.finished():
+      pendingRequest.future.cancelSoon()
+    server.pendingRequests.del(requestId)
+    return true
+  return false
+
+proc isRequestCancelled*(server: LSPServer, id: JsonNode): bool =
+  let requestId = $id
+  if requestId in server.pendingRequests:
+    return server.pendingRequests[requestId].cancelled
+  return false
+
+template withCancellationSupport*(
+    server: LSPServer, id: JsonNode, methodName: string, body: untyped
+): untyped =
+  let requestFuture = newFuture[void](methodName)
+  server.addPendingRequest(id, requestFuture)
+
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    body
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    requestFuture.complete()
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+    requestFuture.fail(e)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+    requestFuture.fail(newException(CancelledError, "Request cancelled"))
+  finally:
+    server.removePendingRequest(id)
+
 proc handleInitialize*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let response = await server.lspHandler.handleInitialize(id, params)
   await server.sendResponse(id, response)
@@ -111,37 +172,29 @@ proc handleDidChangeConfiguration(server: LSPServer, params: JsonNode) {.async.}
       notification["method"].getStr(), notification["params"]
     )
 
-proc handleHover(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  try:
+proc handleHover*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  server.withCancellationSupport(id, "handleHover"):
     let response = await server.lspHandler.handleHover(id, params)
     await server.sendResponse(id, response)
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
 
-proc handleCompletion(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  try:
+proc handleCompletion*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  server.withCancellationSupport(id, "handleCompletion"):
     let response = await server.lspHandler.handleCompletion(id, params)
     await server.sendResponse(id, response)
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
 
-proc handleSemanticTokensFull(
+proc handleSemanticTokensFull*(
     server: LSPServer, id: JsonNode, params: JsonNode
 ) {.async.} =
-  try:
+  server.withCancellationSupport(id, "handleSemanticTokensFull"):
     let response = await server.lspHandler.handleSemanticTokensFull(id, params)
     await server.sendResponse(id, response)
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
 
 proc handleSemanticTokensRange(
     server: LSPServer, id: JsonNode, params: JsonNode
 ) {.async.} =
-  try:
+  server.withCancellationSupport(id, "handleSemanticTokensRange"):
     let response = await server.lspHandler.handleSemanticTokensRange(id, params)
     await server.sendResponse(id, response)
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
 
 proc handleInlayHint(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
@@ -157,12 +210,10 @@ proc handleDeclaration(server: LSPServer, id: JsonNode, params: JsonNode) {.asyn
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
-proc handleDefinition(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  try:
+proc handleDefinition*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  server.withCancellationSupport(id, "handleDefinition"):
     let response = await server.lspHandler.handleDefinition(id, params)
     await server.sendResponse(id, response)
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
 
 proc handleTypeDefinition(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
@@ -211,6 +262,17 @@ proc handleDocumentFormatting(
     await server.sendResponse(id, response)
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
+
+proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
+  if params.hasKey("id"):
+    let requestId = params["id"]
+    let cancelled = server.cancelRequest(requestId)
+    if cancelled:
+      logInfo("Successfully cancelled request: " & $requestId)
+    else:
+      logInfo("Request not found or already completed: " & $requestId)
+  else:
+    logWarn("Cancel request missing id parameter")
 
 proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
   let methodName = message["method"].getStr()
@@ -272,6 +334,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":
     await server.handleDidChangeConfiguration(params)
+  of "$/cancelRequest":
+    await server.handleCancelRequest(params)
   of "shutdown":
     logInfo("Received shutdown request")
     await server.sendResponse(id, newJNull())
