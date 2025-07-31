@@ -1,4 +1,4 @@
-import std/[strutils, strformat, json]
+import std/[strutils, strformat, json, tables]
 
 import pkg/chronos
 
@@ -104,29 +104,40 @@ proc isRequestCancelled*(server: LSPServer, id: JsonNode): bool =
 template withCancellationSupport*(
     server: LSPServer, id: JsonNode, methodName: string, body: untyped
 ): untyped =
+  # Add to pending requests immediately when the template is expanded
   let requestFuture = newFuture[void](methodName)
   server.addPendingRequest(id, requestFuture)
 
-  try:
-    if server.isRequestCancelled(id):
+  # Create an async closure that handles the actual work and cleanup  
+  proc doWork() {.async.} =
+    try:
+      if server.isRequestCancelled(id):
+        await server.sendError(-32800, "Request was cancelled", id)
+        requestFuture.complete()
+        return
+
+      body
+
+      if server.isRequestCancelled(id):
+        await server.sendError(-32800, "Request was cancelled", id)
+        requestFuture.complete()
+        return
+
+      requestFuture.complete()
+    except LSPError as e:
+      await server.sendError(-32603, e.msg, id)
+      requestFuture.fail(e)
+    except CancelledError:
       await server.sendError(-32800, "Request was cancelled", id)
-      return
-
-    body
-
-    if server.isRequestCancelled(id):
-      await server.sendError(-32800, "Request was cancelled", id)
-      return
-
-    requestFuture.complete()
-  except LSPError as e:
-    await server.sendError(-32603, e.msg, id)
-    requestFuture.fail(e)
-  except CancelledError:
-    await server.sendError(-32800, "Request was cancelled", id)
-    requestFuture.fail(newException(CancelledError, "Request cancelled"))
-  finally:
-    server.removePendingRequest(id)
+      requestFuture.fail(newException(CancelledError, "Request cancelled"))
+    except Exception as e:
+      await server.sendError(-32603, "Internal error: " & e.msg, id)
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+  
+  # Start the work asynchronously
+  await doWork()
 
 proc handleInitialize*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   let response = await server.lspHandler.handleInitialize(id, params)
@@ -172,22 +183,119 @@ proc handleDidChangeConfiguration(server: LSPServer, params: JsonNode) {.async.}
       notification["method"].getStr(), notification["params"]
     )
 
-proc handleHover*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  server.withCancellationSupport(id, "handleHover"):
-    let response = await server.lspHandler.handleHover(id, params)
-    await server.sendResponse(id, response)
+proc handleHoverImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
 
-proc handleCompletion*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  server.withCancellationSupport(id, "handleCompletion"):
-    let response = await server.lspHandler.handleCompletion(id, params)
+    let response = await server.lspHandler.handleHover(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
     await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
+
+proc handleHover*(server: LSPServer, id: JsonNode, params: JsonNode): Future[void] =
+  # Add to pending requests immediately (synchronously) when called
+  let requestFuture = newFuture[void]("handleHover")
+  server.addPendingRequest(id, requestFuture)
+  
+  # Start the async implementation and handle cleanup asynchronously
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleHoverImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+  
+  # Start the wrapper
+  asyncSpawn asyncWrapper()
+  
+  return requestFuture
+
+proc handleCompletionImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    let response = await server.lspHandler.handleCompletion(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
+
+proc handleCompletion*(server: LSPServer, id: JsonNode, params: JsonNode): Future[void] =
+  let requestFuture = newFuture[void]("handleCompletion")
+  server.addPendingRequest(id, requestFuture)
+  
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleCompletionImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+  
+  asyncSpawn asyncWrapper()
+  return requestFuture
+
+proc handleSemanticTokensFullImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    let response = await server.lspHandler.handleSemanticTokensFull(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
 
 proc handleSemanticTokensFull*(
     server: LSPServer, id: JsonNode, params: JsonNode
-) {.async.} =
-  server.withCancellationSupport(id, "handleSemanticTokensFull"):
-    let response = await server.lspHandler.handleSemanticTokensFull(id, params)
-    await server.sendResponse(id, response)
+): Future[void] =
+  let requestFuture = newFuture[void]("handleSemanticTokensFull")
+  server.addPendingRequest(id, requestFuture)
+  
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleSemanticTokensFullImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+  
+  asyncSpawn asyncWrapper()
+  return requestFuture
 
 proc handleSemanticTokensRange(
     server: LSPServer, id: JsonNode, params: JsonNode
@@ -210,10 +318,41 @@ proc handleDeclaration(server: LSPServer, id: JsonNode, params: JsonNode) {.asyn
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
-proc handleDefinition*(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
-  server.withCancellationSupport(id, "handleDefinition"):
+proc handleDefinitionImpl(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
     let response = await server.lspHandler.handleDefinition(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
     await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
+
+proc handleDefinition*(server: LSPServer, id: JsonNode, params: JsonNode): Future[void] =
+  let requestFuture = newFuture[void]("handleDefinition")
+  server.addPendingRequest(id, requestFuture)
+  
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleDefinitionImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+  
+  asyncSpawn asyncWrapper()
+  return requestFuture
 
 proc handleTypeDefinition(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
