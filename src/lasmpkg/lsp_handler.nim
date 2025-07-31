@@ -314,19 +314,16 @@ proc handleDidOpen*(
   handler.documents[textDocItem.uri] =
     Document(content: textDocItem.text, version: textDocItem.version)
 
-  let documentCount = handler.documents.len
-  let fileName = textDocItem.uri.split("/")[^1]
-
   # Create LogMessageParams for the notification
-  let logParams = LogMessageParams()
-  logParams.`type` = 5 # Log message
-  logParams.message = fmt"Opened document: {fileName} (total: {documentCount} files)"
-
-  let notification = newJObject()
-  notification["method"] = %"window/logMessage"
-  notification["params"] = %logParams
-
-  var notifications = @[notification]
+  var notifications: seq[JsonNode] = @[]
+  notifications.add(
+    %*{
+      "method": "window/logMessage",
+      "params": {
+        "type": 5, "message": fmt"Received textDocument/didOpen notification: {params}"
+      },
+    }
+  )
 
   # Publish diagnostics for the opened document
   let diagnosticNotifications = await handler.publishDiagnostics(textDocItem.uri)
@@ -397,11 +394,16 @@ proc handleDidChange*(
     logParams.message =
       fmt"Updated document: {fileName} (v{version}, {contentLength} chars)"
 
-    let notification = newJObject()
-    notification["method"] = %"window/logMessage"
-    notification["params"] = %logParams
-
-    var notifications = @[notification]
+    var notifications: seq[JsonNode] = @[]
+    notifications.add(
+      %*{
+        "method": "window/logMessage",
+        "params": {
+          "type": 5,
+          "message": fmt"Received textDocument/didChange notification: {params}",
+        },
+      }
+    )
 
     # Publish diagnostics for the changed document
     let diagnosticNotifications = await handler.publishDiagnostics(versionedTextDoc.uri)
@@ -436,20 +438,19 @@ proc handleDidClose*(
 
   if textDocIdentifier.uri in handler.documents:
     handler.documents.del(textDocIdentifier.uri)
-    let fileName = textDocIdentifier.uri.split("/")[^1]
-    let remainingCount = handler.documents.len
+
+    var notifications: seq[JsonNode] = @[]
 
     # Create LogMessageParams for the notification
-    let logParams = LogMessageParams()
-    logParams.`type` = 5 # Log message
-    logParams.message =
-      fmt"Closed document: {fileName} (remaining: {remainingCount} files)"
-
-    let notification = newJObject()
-    notification["method"] = %"window/logMessage"
-    notification["params"] = %logParams
-
-    var notifications = @[notification]
+    notifications.add(
+      %*{
+        "method": "window/logMessage",
+        "params": {
+          "type": 5,
+          "message": fmt"Received textDocument/didClose notification: {params}",
+        },
+      }
+    )
 
     # Clear diagnostics for the closed document
     let clearParams = PublishDiagnosticsParams()
@@ -465,16 +466,25 @@ proc handleDidClose*(
   else:
     let fileName = textDocIdentifier.uri.split("/")[^1]
 
+    var notifications: seq[JsonNode] = @[]
+
+    # Create LogMessageParams for the notification
+    notifications.add(
+      %*{
+        "method": "window/logMessage",
+        "params": {
+          "type": 5,
+          "message": fmt"Received textDocument/didClose notification: {params}",
+        },
+      }
+    )
+
     # Create LogMessageParams for the warning
     let logParams = LogMessageParams()
     logParams.`type` = 2 # Warning
     logParams.message = fmt"Warning: Attempted to close unopened document: {fileName}"
 
-    let notification = newJObject()
-    notification["method"] = %"window/logMessage"
-    notification["params"] = %logParams
-
-    return @[notification]
+    return notifications
 
 proc handleHover*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
@@ -600,8 +610,10 @@ proc handleDidChangeConfiguration*(
   notifications.add(
     %*{
       "method": "window/logMessage",
-      "params":
-        {"type": 5, "message": "Received workspace/didChangeConfiguration notification"},
+      "params": {
+        "type": 5,
+        "message": fmt"Received workspace/didChangeConfiguration notification: {params}",
+      },
     }
   )
 
