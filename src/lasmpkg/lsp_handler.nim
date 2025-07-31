@@ -413,16 +413,30 @@ proc handleDidChange*(
   else:
     let fileName = versionedTextDoc.uri.split("/")[^1]
 
+    var notifications: seq[JsonNode] = @[]
+
+    # Create LogMessageParams for the notification
+    notifications.add(
+      %*{
+        "method": "window/logMessage",
+        "params": {
+          "type": 5,
+          "message": fmt"Received textDocument/didChange notification: {params}",
+        },
+      }
+    )
+
     # Create LogMessageParams for the warning
     let logParams = LogMessageParams()
     logParams.`type` = 2 # Warning
     logParams.message = fmt"Warning: Attempted to update unopened document: {fileName}"
 
-    let notification = newJObject()
-    notification["method"] = %"window/logMessage"
-    notification["params"] = %logParams
+    let warningNotification = newJObject()
+    warningNotification["method"] = %"window/logMessage"
+    warningNotification["params"] = %logParams
+    notifications.add(warningNotification)
 
-    return @[notification]
+    return notifications
 
 proc handleDidClose*(
     handler: LSPHandler, params: JsonNode
@@ -483,6 +497,11 @@ proc handleDidClose*(
     let logParams = LogMessageParams()
     logParams.`type` = 2 # Warning
     logParams.message = fmt"Warning: Attempted to close unopened document: {fileName}"
+
+    let warningNotification = newJObject()
+    warningNotification["method"] = %"window/logMessage"
+    warningNotification["params"] = %logParams
+    notifications.add(warningNotification)
 
     return notifications
 
