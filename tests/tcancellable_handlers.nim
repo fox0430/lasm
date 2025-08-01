@@ -1,7 +1,6 @@
 import std/[unittest, json, strutils]
 import pkg/chronos
-import ../src/lasmpkg/[server, transport, logger, scenario, lsp_handler]
-import ../src/lasmpkg/protocol/types
+import ../src/lasmpkg/[server, transport, logger, scenario]
 
 proc createTestServer(): LSPServer =
   let mockTransport = newMockTransport()

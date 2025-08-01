@@ -1,7 +1,6 @@
 import std/[unittest, json, tables]
 import pkg/chronos
-import ../src/lasmpkg/[server, transport, logger, scenario, lsp_handler]
-import ../src/lasmpkg/protocol/types
+import ../src/lasmpkg/[server, transport, logger, scenario]
 
 suite "$/cancelRequest functionality tests":
   setup:

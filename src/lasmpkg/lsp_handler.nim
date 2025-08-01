@@ -739,8 +739,6 @@ proc handleSemanticTokensFull*(
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create semantic tokens from scenario configuration
     let semanticTokens = SemanticTokens()
     semanticTokens.resultId = some("result-" & $handler.documents.len)
@@ -826,12 +824,9 @@ proc handleInlayHint*(
   # Extract text document URI and range
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let rangeNode = params["range"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create inlay hints from scenario configuration
     var hints: seq[JsonNode] = @[]
 
@@ -883,12 +878,9 @@ proc handleDeclaration*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create declaration response from scenario configuration
     if scenario.declaration.locations.len > 0:
       # Return array of locations
@@ -933,12 +925,9 @@ proc handleDefinition*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create definition response from scenario configuration
     if scenario.definition.locations.len > 0:
       # Return array of locations
@@ -983,12 +972,9 @@ proc handleTypeDefinition*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create type definition response from scenario configuration
     if scenario.typeDefinition.locations.len > 0:
       # Return array of locations
@@ -1033,12 +1019,9 @@ proc handleImplementation*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create implementation response from scenario configuration
     if scenario.implementation.locations.len > 0:
       # Return array of locations
@@ -1083,14 +1066,11 @@ proc handleReferences*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
   let context = params["context"]
   let includeDeclaration = context["includeDeclaration"].getBool(true)
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create references response from scenario configuration
     var locations: seq[JsonNode] = @[]
 
@@ -1145,12 +1125,9 @@ proc handleDocumentHighlight*(
   # Extract position information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create document highlights from scenario configuration
     var highlights: seq[JsonNode] = @[]
 
@@ -1189,13 +1166,10 @@ proc handleTextDocumentRename*(
   # Extract position and new name information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let position = params["position"]
   let newName = params["newName"].getStr()
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create workspace edit response from scenario configuration
     if scenario.rename.workspaceEdit.changes.len > 0 or
         scenario.rename.workspaceEdit.documentChanges.len > 0:
@@ -1262,16 +1236,9 @@ proc handleDocumentFormatting*(
   # Extract document information
   let textDocument = params["textDocument"]
   let uri = textDocument["uri"].getStr()
-  let options =
-    if params.hasKey("options"):
-      params["options"]
-    else:
-      newJObject()
 
   # Get document content if available
   if uri in handler.documents:
-    let doc = handler.documents[uri]
-
     # Create formatting response from scenario configuration
     var edits: seq[JsonNode] = @[]
 
