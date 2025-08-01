@@ -2,3 +2,6 @@ lasm
 
 tests/*
 !tests/*.*
+
+nimble.develop
+nimble.paths
