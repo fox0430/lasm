@@ -505,6 +505,83 @@ proc handleDidClose*(
 
     return notifications
 
+proc handleDidSave*(
+    handler: LSPHandler, params: JsonNode
+): Future[seq[JsonNode]] {.async.} =
+  # Parse the DidSaveTextDocumentParams from JSON
+  let didSaveParams = DidSaveTextDocumentParams()
+
+  # Extract TextDocumentIdentifier
+  let textDocJson = params["textDocument"]
+  let textDocIdentifier = TextDocumentIdentifier()
+  textDocIdentifier.uri = textDocJson["uri"].getStr()
+  didSaveParams.textDocument = textDocIdentifier
+
+  # Extract optional text content if provided
+  if params.hasKey("text"):
+    didSaveParams.text = some(params["text"].getStr())
+
+  var notifications: seq[JsonNode] = @[]
+
+  # Create LogMessageParams for the notification
+  notifications.add(
+    %*{
+      "method": "window/logMessage",
+      "params": {
+        "type": 5, "message": fmt"Received textDocument/didSave notification: {params}"
+      },
+    }
+  )
+
+  # Update the document content if text was provided
+  if didSaveParams.text.isSome and textDocIdentifier.uri in handler.documents:
+    handler.documents[textDocIdentifier.uri].content = didSaveParams.text.get()
+
+    let fileName = textDocIdentifier.uri.split("/")[^1]
+    let contentLength = handler.documents[textDocIdentifier.uri].content.len
+
+    # Log the update
+    let logParams = LogMessageParams()
+    logParams.`type` = 5 # Log message
+    logParams.message = fmt"Saved document: {fileName} ({contentLength} chars)"
+
+    let logNotification = newJObject()
+    logNotification["method"] = %"window/logMessage"
+    logNotification["params"] = %logParams
+    notifications.add(logNotification)
+  elif textDocIdentifier.uri in handler.documents:
+    # Document exists but no text provided
+    let fileName = textDocIdentifier.uri.split("/")[^1]
+
+    let logParams = LogMessageParams()
+    logParams.`type` = 5 # Log message
+    logParams.message = fmt"Saved document: {fileName} (no text included)"
+
+    let logNotification = newJObject()
+    logNotification["method"] = %"window/logMessage"
+    logNotification["params"] = %logParams
+    notifications.add(logNotification)
+  else:
+    # Document not tracked
+    let fileName = textDocIdentifier.uri.split("/")[^1]
+
+    let logParams = LogMessageParams()
+    logParams.`type` = 2 # Warning
+    logParams.message = fmt"Warning: Saved unknown document: {fileName}"
+
+    let warningNotification = newJObject()
+    warningNotification["method"] = %"window/logMessage"
+    warningNotification["params"] = %logParams
+    notifications.add(warningNotification)
+
+  # Optionally publish diagnostics after save
+  if textDocIdentifier.uri in handler.documents:
+    let diagnosticNotifications =
+      await handler.publishDiagnostics(textDocIdentifier.uri)
+    notifications.add(diagnosticNotifications)
+
+  return notifications
+
 proc handleHover*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
 ): Future[JsonNode] {.async.} =
