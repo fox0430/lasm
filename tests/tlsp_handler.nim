@@ -636,6 +636,21 @@ suite "lsp_handler module tests":
     check handler.documents.len == 0
     check notifications.len == 2
 
+  test "handleDidChange with null range":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{
+        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+        "contentChanges": [{"text": "new content", "range": nil, "rangeLength": nil}],
+      }
+
+    let notifications = waitFor handler.handleDidChange(params)
+
+    check handler.documents.len == 0
+    check notifications.len == 2
+
   test "handleDidClose removes document":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
