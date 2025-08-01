@@ -352,7 +352,7 @@ proc handleDidChange*(
     let changeEvent = TextDocumentContentChangeEvent()
     changeEvent.text = changeJson["text"].getStr()
 
-    if changeJson.hasKey("range"):
+    if changeJson.hasKey("range") and changeJson["range"].kind != JNull:
       let rangeJson = changeJson["range"]
       let startJson = rangeJson["start"]
       let endJson = rangeJson["end"]
@@ -367,7 +367,7 @@ proc handleDidChange*(
       )
       changeEvent.range = some(Range(start: startPos, `end`: endPos))
 
-      if changeJson.hasKey("rangeLength"):
+      if changeJson.hasKey("rangeLength") and changeJson["rangeLength"].kind != JNull:
         changeEvent.rangeLength = some(changeJson["rangeLength"].getInt)
 
     contentChanges.add(changeEvent)
