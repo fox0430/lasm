@@ -176,6 +176,13 @@ proc handleDidClose(server: LSPServer, params: JsonNode) {.async.} =
       notification["method"].getStr(), notification["params"]
     )
 
+proc handleDidSave(server: LSPServer, params: JsonNode) {.async.} =
+  let notifications = await server.lspHandler.handleDidSave(params)
+  for notification in notifications:
+    await server.sendNotification(
+      notification["method"].getStr(), notification["params"]
+    )
+
 proc handleDidChangeConfiguration(server: LSPServer, params: JsonNode) {.async.} =
   let notifications = await server.lspHandler.handleDidChangeConfiguration(params)
   for notification in notifications:
@@ -449,6 +456,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleDidChange(params)
   of "textDocument/didClose":
     await server.handleDidClose(params)
+  of "textDocument/didSave":
+    await server.handleDidSave(params)
   of "textDocument/hover":
     await server.handleHover(id, params)
   of "textDocument/completion":

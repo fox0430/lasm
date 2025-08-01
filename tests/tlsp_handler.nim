@@ -3152,3 +3152,135 @@ suite "lsp_handler module tests":
     check response.hasKey("capabilities")
     check response["capabilities"].hasKey("documentFormattingProvider")
     check response["capabilities"]["documentFormattingProvider"].getBool() == true
+
+  test "handleDidSave with text updates document":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # First open a document
+    handler.documents["file:///test.nim"] = Document(content: "old content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "text": "saved content"}
+
+    let notifications = waitFor handler.handleDidSave(params)
+
+    # Check document was updated
+    check "file:///test.nim" in handler.documents
+    let doc = handler.documents["file:///test.nim"]
+    check doc.content == "saved content"
+    check doc.version == 1 # version unchanged on save
+
+    # Should have log messages
+    check notifications.len >= 2
+    check notifications[0]["method"].getStr() == "window/logMessage"
+    check notifications[0]["params"]["message"].getStr().contains("didSave")
+
+  test "handleDidSave without text keeps document unchanged":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # First open a document
+    handler.documents["file:///test.nim"] =
+      Document(content: "original content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let notifications = waitFor handler.handleDidSave(params)
+
+    # Check document content unchanged
+    check "file:///test.nim" in handler.documents
+    let doc = handler.documents["file:///test.nim"]
+    check doc.content == "original content"
+    check doc.version == 1
+
+    # Should have log messages
+    check notifications.len >= 2
+    check notifications[0]["method"].getStr() == "window/logMessage"
+    check notifications[1]["params"]["message"].getStr().contains("no text included")
+
+  test "handleDidSave with unknown document shows warning":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///unknown.nim"}, "text": "some content"}
+
+    let notifications = waitFor handler.handleDidSave(params)
+
+    # Document should not be added
+    check "file:///unknown.nim" notin handler.documents
+
+    # Should have warning message
+    check notifications.len >= 2
+    check notifications[0]["method"].getStr() == "window/logMessage"
+    check notifications[1]["method"].getStr() == "window/logMessage"
+    check notifications[1]["params"]["type"].getInt() == 2 # Warning
+    check notifications[1]["params"]["message"].getStr().contains("unknown document")
+
+  test "handleDidSave publishes diagnostics when document exists":
+    let sm = createTestScenarioManager()
+    # Enable diagnostics for this test
+    sm.scenarios["default"].diagnostics.enabled = true
+    sm.scenarios["default"].diagnostics.diagnostics =
+      @[
+        DiagnosticContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 5),
+          ),
+          severity: 1, # Error
+          message: "Test diagnostic",
+          code: none(string),
+          source: some("lasm"),
+          relatedInformation: @[],
+        )
+      ]
+
+    let handler = newLSPHandler(sm)
+
+    # First open a document
+    handler.documents["file:///test.nim"] = Document(content: "original", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "text": "saved content"}
+
+    let notifications = waitFor handler.handleDidSave(params)
+
+    # Should have log messages and diagnostic publication
+    check notifications.len >= 3
+
+    # Find the publishDiagnostics notification
+    var foundDiagnostics = false
+    for notification in notifications:
+      if notification["method"].getStr() == "textDocument/publishDiagnostics":
+        foundDiagnostics = true
+        check notification["params"]["uri"].getStr() == "file:///test.nim"
+        check notification["params"]["diagnostics"].len == 1
+        break
+
+    check foundDiagnostics
+
+  test "handleDidSave with multiple documents":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # Open multiple documents
+    handler.documents["file:///test1.nim"] = Document(content: "content1", version: 1)
+    handler.documents["file:///test2.nim"] = Document(content: "content2", version: 1)
+    handler.documents["file:///test3.nim"] = Document(content: "content3", version: 1)
+
+    # Save test2.nim with new content
+    let params =
+      %*{"textDocument": {"uri": "file:///test2.nim"}, "text": "updated content2"}
+
+    let notifications = waitFor handler.handleDidSave(params)
+
+    # Check only test2.nim was updated
+    check handler.documents["file:///test1.nim"].content == "content1"
+    check handler.documents["file:///test2.nim"].content == "updated content2"
+    check handler.documents["file:///test3.nim"].content == "content3"
+
+    # Verify notifications
+    check notifications.len >= 2
+    check notifications[1]["params"]["message"].getStr().contains("test2.nim")

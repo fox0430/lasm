@@ -45,6 +45,7 @@ See `lsp-test-config-sample.json` for examples.
 | workspace/didChangeConfiguration | |
 | textDocument/didOpen | |
 | textDocument/didChange | |
+| textDocument/didSave | |
 | textDocument/didClose | |
 | textDocument/hover | |
 | textDocument/completion | |
