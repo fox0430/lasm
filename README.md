@@ -6,7 +6,7 @@ A configurable LSP server for debugging/testing LSP clients.
 
 ```bash
 # Build
-nimble build
+nimble install lasm
 
 # Create example config
 ./lasm --create-sample-config
