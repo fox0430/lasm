@@ -2,7 +2,7 @@
 
 version = "0.1.0"
 author = "fox0430"
-description = "LSP server for testing LSP clients"
+description = "A configurable LSP server for debugging/testing LSP clients"
 license = "MIT"
 srcDir = "src"
 bin = @["lasm"]
