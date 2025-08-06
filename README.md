@@ -5,14 +5,14 @@ A configurable LSP server for debugging/testing LSP clients.
 ## Quick Start
 
 ```bash
-# Build
+# Install
 nimble install lasm
 
 # Create example config
-./lasm --create-sample-config
+lasm --create-sample-config
 
 # Start server
-./lasm --config ./lsp-test-config-sample.json
+lasm --config ./lsp-test-config-sample.json
 ```
 
 ## Usage
