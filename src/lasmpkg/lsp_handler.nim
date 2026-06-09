@@ -57,18 +57,16 @@ proc handleInitialize*(
 
   # Set semantic tokens provider
   let semanticTokensLegend = SemanticTokensLegend()
-  semanticTokensLegend.tokenTypes =
-    @[
-      "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
-      "parameter", "variable", "property", "enumMember", "event", "function", "method",
-      "macro", "keyword", "modifier", "comment", "string", "number", "regexp",
-      "operator", "decorator",
-    ]
-  semanticTokensLegend.tokenModifiers =
-    @[
-      "declaration", "definition", "readonly", "static", "deprecated", "abstract",
-      "async", "modification", "documentation", "defaultLibrary",
-    ]
+  semanticTokensLegend.tokenTypes = @[
+    "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+    "parameter", "variable", "property", "enumMember", "event", "function", "method",
+    "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator",
+    "decorator",
+  ]
+  semanticTokensLegend.tokenModifiers = @[
+    "declaration", "definition", "readonly", "static", "deprecated", "abstract",
+    "async", "modification", "documentation", "defaultLibrary",
+  ]
 
   let semanticTokensOptions = SemanticTokensOptions()
   semanticTokensOptions.legend = semanticTokensLegend
@@ -749,29 +747,28 @@ proc handleSemanticTokensFull*(
     else:
       # Generate sample semantic tokens for demonstration
       # Format: [deltaLine, deltaStart, length, tokenType, tokenModifiers]
-      semanticTokens.data =
-        @[
-          uinteger(0),
-          uinteger(0),
-          uinteger(8),
-          uinteger(14),
-          uinteger(0), # "function" keyword
-          uinteger(0),
-          uinteger(9),
-          uinteger(4),
-          uinteger(12),
-          uinteger(1), # function name
-          uinteger(1),
-          uinteger(2),
-          uinteger(3),
-          uinteger(6),
-          uinteger(0), # variable "var"
-          uinteger(0),
-          uinteger(4),
-          uinteger(4),
-          uinteger(15),
-          uinteger(0), # type keyword
-        ]
+      semanticTokens.data = @[
+        uinteger(0),
+        uinteger(0),
+        uinteger(8),
+        uinteger(14),
+        uinteger(0), # "function" keyword
+        uinteger(0),
+        uinteger(9),
+        uinteger(4),
+        uinteger(12),
+        uinteger(1), # function name
+        uinteger(1),
+        uinteger(2),
+        uinteger(3),
+        uinteger(6),
+        uinteger(0), # variable "var"
+        uinteger(0),
+        uinteger(4),
+        uinteger(4),
+        uinteger(15),
+        uinteger(0), # type keyword
+      ]
 
     return %semanticTokens
   else:

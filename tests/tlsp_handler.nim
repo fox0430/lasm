@@ -92,69 +92,66 @@ proc createTestScenarioManager(): ScenarioManager =
     completion: CompletionConfig(
       enabled: true,
       isIncomplete: false,
-      items:
-        @[
-          CompletionContent(
-            label: "testFunc",
-            kind: 3, # Function
-            detail: some("func testFunc(x: int): string"),
-            documentation: some("Test function for completion"),
-            insertText: some("testFunc(${1:x})"),
-            sortText: some("1"),
-          ),
-          CompletionContent(
-            label: "testVar",
-            kind: 6, # Variable
-            detail: some("var testVar: bool"),
-            documentation: some("Test variable"),
-          ),
-        ],
+      items: @[
+        CompletionContent(
+          label: "testFunc",
+          kind: 3, # Function
+          detail: some("func testFunc(x: int): string"),
+          documentation: some("Test function for completion"),
+          insertText: some("testFunc(${1:x})"),
+          sortText: some("1"),
+        ),
+        CompletionContent(
+          label: "testVar",
+          kind: 6, # Variable
+          detail: some("var testVar: bool"),
+          documentation: some("Test variable"),
+        ),
+      ],
     ),
     diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
     semanticTokens: SemanticTokensConfig(
       enabled: true,
-      tokens:
-        @[
-          uinteger(0),
-          uinteger(0),
-          uinteger(8),
-          uinteger(14),
-          uinteger(0), # function keyword  
-          uinteger(0),
-          uinteger(9),
-          uinteger(4),
-          uinteger(12),
-          uinteger(1), # function name
-          uinteger(1),
-          uinteger(2),
-          uinteger(3),
-          uinteger(6),
-          uinteger(0), # variable
-        ],
+      tokens: @[
+        uinteger(0),
+        uinteger(0),
+        uinteger(8),
+        uinteger(14),
+        uinteger(0), # function keyword  
+        uinteger(0),
+        uinteger(9),
+        uinteger(4),
+        uinteger(12),
+        uinteger(1), # function name
+        uinteger(1),
+        uinteger(2),
+        uinteger(3),
+        uinteger(6),
+        uinteger(0), # variable
+      ],
     ),
     inlayHint: InlayHintConfig(
       enabled: true,
-      hints:
-        @[
-          InlayHintContent(
-            position: Position(line: 1, character: 15),
-            label: ": string",
-            kind: some(1),
-            tooltip: some("Parameter type hint"),
-            paddingLeft: some(false),
-            paddingRight: some(false),
-            textEdits: @[],
-          ),
-          InlayHintContent(
-            position: Position(line: 5, character: 20),
-            label: " -> bool",
-            kind: some(1),
-            tooltip: some("Return type hint"),
-            paddingLeft: some(true),
-            paddingRight: some(false),
-            textEdits: @[],
-          ),
-        ],
+      hints: @[
+        InlayHintContent(
+          position: Position(line: 1, character: 15),
+          label: ": string",
+          kind: some(1),
+          tooltip: some("Parameter type hint"),
+          paddingLeft: some(false),
+          paddingRight: some(false),
+          textEdits: @[],
+        ),
+        InlayHintContent(
+          position: Position(line: 5, character: 20),
+          label: " -> bool",
+          kind: some(1),
+          tooltip: some("Return type hint"),
+          paddingLeft: some(true),
+          paddingRight: some(false),
+          textEdits: @[],
+        ),
+      ],
     ),
     declaration: DeclarationConfig(
       enabled: true,
@@ -165,23 +162,22 @@ proc createTestScenarioManager(): ScenarioManager =
           `end`: Position(line: 5, character: 20),
         ),
       ),
-      locations:
-        @[
-          DeclarationContent(
-            uri: "file:///multiple1.nim",
-            range: Range(
-              start: Position(line: 3, character: 5),
-              `end`: Position(line: 3, character: 15),
-            ),
+      locations: @[
+        DeclarationContent(
+          uri: "file:///multiple1.nim",
+          range: Range(
+            start: Position(line: 3, character: 5),
+            `end`: Position(line: 3, character: 15),
           ),
-          DeclarationContent(
-            uri: "file:///multiple2.nim",
-            range: Range(
-              start: Position(line: 7, character: 0),
-              `end`: Position(line: 7, character: 10),
-            ),
+        ),
+        DeclarationContent(
+          uri: "file:///multiple2.nim",
+          range: Range(
+            start: Position(line: 7, character: 0),
+            `end`: Position(line: 7, character: 10),
           ),
-        ],
+        ),
+      ],
     ),
     definition: DefinitionConfig(
       enabled: true,
@@ -192,23 +188,22 @@ proc createTestScenarioManager(): ScenarioManager =
           `end`: Position(line: 15, character: 12),
         ),
       ),
-      locations:
-        @[
-          DefinitionContent(
-            uri: "file:///implementation1.nim",
-            range: Range(
-              start: Position(line: 10, character: 4),
-              `end`: Position(line: 10, character: 14),
-            ),
+      locations: @[
+        DefinitionContent(
+          uri: "file:///implementation1.nim",
+          range: Range(
+            start: Position(line: 10, character: 4),
+            `end`: Position(line: 10, character: 14),
           ),
-          DefinitionContent(
-            uri: "file:///implementation2.nim",
-            range: Range(
-              start: Position(line: 20, character: 8),
-              `end`: Position(line: 20, character: 18),
-            ),
+        ),
+        DefinitionContent(
+          uri: "file:///implementation2.nim",
+          range: Range(
+            start: Position(line: 20, character: 8),
+            `end`: Position(line: 20, character: 18),
           ),
-        ],
+        ),
+      ],
     ),
     typeDefinition: TypeDefinitionConfig(
       enabled: true,
@@ -219,23 +214,22 @@ proc createTestScenarioManager(): ScenarioManager =
           `end`: Position(line: 8, character: 10),
         ),
       ),
-      locations:
-        @[
-          TypeDefinitionContent(
-            uri: "file:///type_definition1.nim",
-            range: Range(
-              start: Position(line: 5, character: 0),
-              `end`: Position(line: 5, character: 15),
-            ),
+      locations: @[
+        TypeDefinitionContent(
+          uri: "file:///type_definition1.nim",
+          range: Range(
+            start: Position(line: 5, character: 0),
+            `end`: Position(line: 5, character: 15),
           ),
-          TypeDefinitionContent(
-            uri: "file:///type_definition2.nim",
-            range: Range(
-              start: Position(line: 12, character: 5),
-              `end`: Position(line: 12, character: 20),
-            ),
+        ),
+        TypeDefinitionContent(
+          uri: "file:///type_definition2.nim",
+          range: Range(
+            start: Position(line: 12, character: 5),
+            `end`: Position(line: 12, character: 20),
           ),
-        ],
+        ),
+      ],
     ),
     delays: DelayConfig(
       hover: 50,
@@ -257,71 +251,68 @@ proc createTestScenarioManager(): ScenarioManager =
           `end`: Position(line: 30, character: 20),
         ),
       ),
-      locations:
-        @[
-          ImplementationContent(
-            uri: "file:///implementation1.nim",
-            range: Range(
-              start: Position(line: 25, character: 0),
-              `end`: Position(line: 25, character: 15),
-            ),
+      locations: @[
+        ImplementationContent(
+          uri: "file:///implementation1.nim",
+          range: Range(
+            start: Position(line: 25, character: 0),
+            `end`: Position(line: 25, character: 15),
           ),
-          ImplementationContent(
-            uri: "file:///implementation2.nim",
-            range: Range(
-              start: Position(line: 35, character: 2),
-              `end`: Position(line: 35, character: 17),
-            ),
+        ),
+        ImplementationContent(
+          uri: "file:///implementation2.nim",
+          range: Range(
+            start: Position(line: 35, character: 2),
+            `end`: Position(line: 35, character: 17),
           ),
-        ],
+        ),
+      ],
     ),
     references: ReferenceConfig(
       enabled: true,
       includeDeclaration: true,
-      locations:
-        @[
-          ReferenceContent(
-            uri: "file:///test_reference1.nim",
-            range: Range(
-              start: Position(line: 12, character: 5),
-              `end`: Position(line: 12, character: 15),
-            ),
+      locations: @[
+        ReferenceContent(
+          uri: "file:///test_reference1.nim",
+          range: Range(
+            start: Position(line: 12, character: 5),
+            `end`: Position(line: 12, character: 15),
           ),
-          ReferenceContent(
-            uri: "file:///test_reference2.nim",
-            range: Range(
-              start: Position(line: 25, character: 8),
-              `end`: Position(line: 25, character: 18),
-            ),
+        ),
+        ReferenceContent(
+          uri: "file:///test_reference2.nim",
+          range: Range(
+            start: Position(line: 25, character: 8),
+            `end`: Position(line: 25, character: 18),
           ),
-        ],
+        ),
+      ],
     ),
     documentHighlight: DocumentHighlightConfig(
       enabled: true,
-      highlights:
-        @[
-          DocumentHighlightContent(
-            range: Range(
-              start: Position(line: 10, character: 5),
-              `end`: Position(line: 10, character: 15),
-            ),
-            kind: some(1), # Text
+      highlights: @[
+        DocumentHighlightContent(
+          range: Range(
+            start: Position(line: 10, character: 5),
+            `end`: Position(line: 10, character: 15),
           ),
-          DocumentHighlightContent(
-            range: Range(
-              start: Position(line: 20, character: 8),
-              `end`: Position(line: 20, character: 18),
-            ),
-            kind: some(2), # Read
+          kind: some(1), # Text
+        ),
+        DocumentHighlightContent(
+          range: Range(
+            start: Position(line: 20, character: 8),
+            `end`: Position(line: 20, character: 18),
           ),
-          DocumentHighlightContent(
-            range: Range(
-              start: Position(line: 25, character: 12),
-              `end`: Position(line: 25, character: 22),
-            ),
-            kind: some(3), # Write
+          kind: some(2), # Read
+        ),
+        DocumentHighlightContent(
+          range: Range(
+            start: Position(line: 25, character: 12),
+            `end`: Position(line: 25, character: 22),
           ),
-        ],
+          kind: some(3), # Write
+        ),
+      ],
     ),
     errors: initTable[string, ErrorConfig](),
   )
@@ -547,15 +538,14 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {
-          "uri": "file:///test.nim",
-          "languageId": "nim",
-          "version": 1,
-          "text": "echo \"hello\"",
-        }
+    let params = %*{
+      "textDocument": {
+        "uri": "file:///test.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "echo \"hello\"",
       }
+    }
 
     let notifications = waitFor handler.handleDidOpen(params)
 
@@ -577,11 +567,10 @@ suite "lsp_handler module tests":
     # First add a document
     handler.documents["file:///test.nim"] = Document(content: "old content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim", "version": 2},
-        "contentChanges": [{"text": "new content"}],
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim", "version": 2},
+      "contentChanges": [{"text": "new content"}],
+    }
 
     let notifications = waitFor handler.handleDidChange(params)
 
@@ -602,17 +591,16 @@ suite "lsp_handler module tests":
     # First add a document
     handler.documents["file:///test.nim"] = Document(content: "old content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim", "version": 2},
-        "contentChanges": [
-          {
-            "range":
-              {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 3}},
-            "text": "updated content",
-          }
-        ],
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 3}},
+          "text": "updated content",
+        }
+      ],
+    }
 
     discard waitFor handler.handleDidChange(params)
 
@@ -625,11 +613,10 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
-        "contentChanges": [{"text": "new content"}],
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+      "contentChanges": [{"text": "new content"}],
+    }
 
     let notifications = waitFor handler.handleDidChange(params)
 
@@ -640,11 +627,10 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
-        "contentChanges": [{"text": "new content", "range": nil, "rangeLength": nil}],
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+      "contentChanges": [{"text": "new content", "range": nil, "rangeLength": nil}],
+    }
 
     let notifications = waitFor handler.handleDidChange(params)
 
@@ -680,11 +666,10 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 5, "character": 10},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 5, "character": 10},
+    }
 
     let response = waitFor handler.handleHover(%1, params)
 
@@ -736,11 +721,10 @@ suite "lsp_handler module tests":
 
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleHover(%1, params)
 
@@ -751,11 +735,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleHover(%1, params)
@@ -765,11 +748,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test" # This scenario has 50ms delay
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleHover(%1, params)
@@ -786,11 +768,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test" # Has completion items
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 5, "character": 10},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 5, "character": 10},
+    }
 
     let response = waitFor handler.handleCompletion(%1, params)
 
@@ -858,11 +839,10 @@ suite "lsp_handler module tests":
 
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleCompletion(%1, params)
 
@@ -873,11 +853,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleCompletion(%1, params)
@@ -887,11 +866,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test" # This scenario has 30ms delay for completion
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleCompletion(%1, params)
@@ -912,12 +890,11 @@ suite "lsp_handler module tests":
       completion: CompletionConfig(
         enabled: true,
         isIncomplete: true,
-        items:
-          @[
-            CompletionContent(
-              label: "partialItem", kind: 1 # Text
-            )
-          ],
+        items: @[
+          CompletionContent(
+            label: "partialItem", kind: 1 # Text
+          )
+        ],
       ),
       diagnostics: DiagnosticConfig(enabled: false, diagnostics: @[]),
       semanticTokens: SemanticTokensConfig(enabled: false, tokens: @[]),
@@ -951,11 +928,10 @@ suite "lsp_handler module tests":
 
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleCompletion(%1, params)
 
@@ -981,26 +957,24 @@ suite "lsp_handler module tests":
     let handler = newLSPHandler(sm)
 
     # Open multiple documents
-    var params1 =
-      %*{
-        "textDocument": {
-          "uri": "file:///test1.nim",
-          "languageId": "nim",
-          "version": 1,
-          "text": "content1",
-        }
+    var params1 = %*{
+      "textDocument": {
+        "uri": "file:///test1.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "content1",
       }
+    }
     discard waitFor handler.handleDidOpen(params1)
 
-    var params2 =
-      %*{
-        "textDocument": {
-          "uri": "file:///test2.nim",
-          "languageId": "nim",
-          "version": 1,
-          "text": "content2",
-        }
+    var params2 = %*{
+      "textDocument": {
+        "uri": "file:///test2.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "content2",
       }
+    }
     discard waitFor handler.handleDidOpen(params2)
 
     check handler.documents.len == 2
@@ -1069,26 +1043,24 @@ suite "lsp_handler module tests":
     let handler = newLSPHandler(sm)
 
     # Test didOpen with count
-    let openParams =
-      %*{
-        "textDocument": {
-          "uri": "file:///test.nim",
-          "languageId": "nim",
-          "version": 1,
-          "text": "echo \"hello\"",
-        }
+    let openParams = %*{
+      "textDocument": {
+        "uri": "file:///test.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "echo \"hello\"",
       }
+    }
     let openNotifications = waitFor handler.handleDidOpen(openParams)
     check openNotifications[0]["params"]["message"].getStr().contains(
       "Received textDocument/didOpen notification:"
     )
 
     # Test didChange with content length
-    let changeParams =
-      %*{
-        "textDocument": {"uri": "file:///test.nim", "version": 2},
-        "contentChanges": [{"text": "new content"}],
-      }
+    let changeParams = %*{
+      "textDocument": {"uri": "file:///test.nim", "version": 2},
+      "contentChanges": [{"text": "new content"}],
+    }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
     check changeNotifications[0]["params"]["message"].getStr().contains(
       "Received textDocument/didChange notification:"
@@ -1106,11 +1078,10 @@ suite "lsp_handler module tests":
     let handler = newLSPHandler(sm)
 
     # Test didChange on non-existent file
-    let changeParams =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
-        "contentChanges": [{"text": "content"}],
-      }
+    let changeParams = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim", "version": 1},
+      "contentChanges": [{"text": "content"}],
+    }
     let changeNotifications = waitFor handler.handleDidChange(changeParams)
     check changeNotifications[1]["params"]["type"].getInt() == 2 # Warning
     check changeNotifications[1]["params"]["message"].getStr().contains(
@@ -1267,12 +1238,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "function test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
+    }
 
     let response = waitFor handler.handleSemanticTokensRange(%1, params)
 
@@ -1288,12 +1258,11 @@ suite "lsp_handler module tests":
     # Use default scenario which has semantic tokens disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}},
+    }
 
     let response = waitFor handler.handleSemanticTokensRange(%1, params)
 
@@ -1308,12 +1277,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "function test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 18}},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleSemanticTokensRange(%1, params)
@@ -1399,12 +1367,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test(param) -> bool", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+    }
 
     let response = waitFor handler.handleInlayHint(%1, params)
 
@@ -1436,12 +1403,11 @@ suite "lsp_handler module tests":
     # Use default scenario which has inlay hints disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+    }
 
     let response = waitFor handler.handleInlayHint(%1, params)
 
@@ -1453,12 +1419,11 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+    }
 
     expect LSPError:
       discard waitFor handler.handleInlayHint(%1, params)
@@ -1472,12 +1437,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test(param) -> bool", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleInlayHint(%1, params)
@@ -1495,12 +1459,11 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "range":
-          {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+    }
 
     let response = waitFor handler.handleInlayHint(%1, params)
 
@@ -1530,11 +1493,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDeclaration(%1, params)
 
@@ -1613,11 +1575,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDeclaration(%1, params)
 
@@ -1634,11 +1595,10 @@ suite "lsp_handler module tests":
     # Use default scenario which has declaration disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDeclaration(%1, params)
 
@@ -1649,11 +1609,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleDeclaration(%1, params)
@@ -1667,11 +1626,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleDeclaration(%1, params)
@@ -1689,11 +1647,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDeclaration(%1, params)
 
@@ -1752,11 +1709,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDeclaration(%1, params)
 
@@ -1771,11 +1727,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDefinition(%1, params)
 
@@ -1864,11 +1819,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDefinition(%1, params)
 
@@ -1885,11 +1839,10 @@ suite "lsp_handler module tests":
     # Use default scenario which has definition disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDefinition(%1, params)
 
@@ -1904,11 +1857,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleImplementation(%1, params)
 
@@ -1938,11 +1890,10 @@ suite "lsp_handler module tests":
     # Use default scenario which has implementation disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleImplementation(%1, params)
 
@@ -1953,11 +1904,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleImplementation(%1, params)
@@ -1971,11 +1921,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleImplementation(%1, params)
@@ -1993,11 +1942,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleImplementation(%1, params)
 
@@ -2008,11 +1956,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleDefinition(%1, params)
@@ -2026,11 +1973,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleDefinition(%1, params)
@@ -2048,11 +1994,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDefinition(%1, params)
 
@@ -2122,11 +2067,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDefinition(%1, params)
 
@@ -2141,12 +2085,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+      "context": {"includeDeclaration": true},
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2227,23 +2170,22 @@ suite "lsp_handler module tests":
       references: ReferenceConfig(
         enabled: true,
         includeDeclaration: false,
-        locations:
-          @[
-            ReferenceContent(
-              uri: "file:///reference1.nim",
-              range: Range(
-                start: Position(line: 5, character: 10),
-                `end`: Position(line: 5, character: 20),
-              ),
+        locations: @[
+          ReferenceContent(
+            uri: "file:///reference1.nim",
+            range: Range(
+              start: Position(line: 5, character: 10),
+              `end`: Position(line: 5, character: 20),
             ),
-            ReferenceContent(
-              uri: "file:///reference2.nim",
-              range: Range(
-                start: Position(line: 15, character: 2),
-                `end`: Position(line: 15, character: 12),
-              ),
+          ),
+          ReferenceContent(
+            uri: "file:///reference2.nim",
+            range: Range(
+              start: Position(line: 15, character: 2),
+              `end`: Position(line: 15, character: 12),
             ),
-          ],
+          ),
+        ],
       ),
       delays: DelayConfig(
         hover: 0,
@@ -2266,12 +2208,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-        "context": {"includeDeclaration": false},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+      "context": {"includeDeclaration": false},
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2295,12 +2236,11 @@ suite "lsp_handler module tests":
     # Use default scenario which has references disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+      "context": {"includeDeclaration": true},
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2312,12 +2252,11 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+      "context": {"includeDeclaration": true},
+    }
 
     expect LSPError:
       discard waitFor handler.handleReferences(%1, params)
@@ -2331,12 +2270,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+      "context": {"includeDeclaration": true},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleReferences(%1, params)
@@ -2356,12 +2294,11 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "position": {"line": 0, "character": 0},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+      "context": {"includeDeclaration": true},
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2378,12 +2315,11 @@ suite "lsp_handler module tests":
       Document(content: "func test() {}", version: 1)
 
     # Test without context parameter - should default to includeDeclaration: true
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-        "context": {"includeDeclaration": true}, # Explicit includeDeclaration
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+      "context": {"includeDeclaration": true}, # Explicit includeDeclaration
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2469,12 +2405,11 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-        "context": {"includeDeclaration": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+      "context": {"includeDeclaration": true},
+    }
 
     let response = waitFor handler.handleReferences(%1, params)
 
@@ -2490,11 +2425,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let response = waitFor handler.handleDocumentHighlight(%1, params)
 
@@ -2530,11 +2464,10 @@ suite "lsp_handler module tests":
     # Use default scenario which has document highlights disabled
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDocumentHighlight(%1, params)
 
@@ -2546,11 +2479,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "error"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     expect LSPError:
       discard waitFor handler.handleDocumentHighlight(%1, params)
@@ -2560,11 +2492,10 @@ suite "lsp_handler module tests":
     sm.currentScenario = "test"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///nonexistent.nim"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+    }
 
     let response = waitFor handler.handleDocumentHighlight(%1, params)
 
@@ -2629,16 +2560,15 @@ suite "lsp_handler module tests":
         ReferenceConfig(enabled: false, locations: @[], includeDeclaration: true),
       documentHighlight: DocumentHighlightConfig(
         enabled: true,
-        highlights:
-          @[
-            DocumentHighlightContent(
-              range: Range(
-                start: Position(line: 5, character: 10),
-                `end`: Position(line: 5, character: 20),
-              ),
-              kind: some(1),
-            )
-          ],
+        highlights: @[
+          DocumentHighlightContent(
+            range: Range(
+              start: Position(line: 5, character: 10),
+              `end`: Position(line: 5, character: 20),
+            ),
+            kind: some(1),
+          )
+        ],
       ),
       delays: DelayConfig(
         hover: 0,
@@ -2663,11 +2593,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "func test() {}", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleDocumentHighlight(%1, params)
@@ -2689,11 +2618,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "test content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "options": {"tabSize": 4, "insertSpaces": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
 
     let response = waitFor handler.handleDocumentFormatting(%1, params)
     check response.kind == JNull
@@ -2762,23 +2690,22 @@ suite "lsp_handler module tests":
       ),
       formatting: FormattingConfig(
         enabled: true,
-        edits:
-          @[
-            FormattingContent(
-              range: Range(
-                start: Position(line: 1, character: 0),
-                `end`: Position(line: 1, character: 20),
-              ),
-              newText: "function formattedFunction() {",
+        edits: @[
+          FormattingContent(
+            range: Range(
+              start: Position(line: 1, character: 0),
+              `end`: Position(line: 1, character: 20),
             ),
-            FormattingContent(
-              range: Range(
-                start: Position(line: 5, character: 2),
-                `end`: Position(line: 5, character: 10),
-              ),
-              newText: "    return;",
+            newText: "function formattedFunction() {",
+          ),
+          FormattingContent(
+            range: Range(
+              start: Position(line: 5, character: 2),
+              `end`: Position(line: 5, character: 10),
             ),
-          ],
+            newText: "    return;",
+          ),
+        ],
       ),
       delays: DelayConfig(
         hover: 0,
@@ -2805,11 +2732,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "test content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "options": {"tabSize": 4, "insertSpaces": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
 
     let response = waitFor handler.handleDocumentFormatting(%1, params)
     check response.kind == JArray
@@ -2917,11 +2843,10 @@ suite "lsp_handler module tests":
 
     # Don't add the document to handler.documents
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///unknown.nim"},
-        "options": {"tabSize": 4, "insertSpaces": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
 
     let response = waitFor handler.handleDocumentFormatting(%1, params)
     check response.kind == JArray
@@ -2991,16 +2916,15 @@ suite "lsp_handler module tests":
       ),
       formatting: FormattingConfig(
         enabled: true,
-        edits:
-          @[
-            FormattingContent(
-              range: Range(
-                start: Position(line: 0, character: 0),
-                `end`: Position(line: 0, character: 5),
-              ),
-              newText: "hello",
-            )
-          ],
+        edits: @[
+          FormattingContent(
+            range: Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 0, character: 5),
+            ),
+            newText: "hello",
+          )
+        ],
       ),
       delays: DelayConfig(
         hover: 0,
@@ -3027,11 +2951,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "test content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "options": {"tabSize": 4, "insertSpaces": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
 
     let startTime = getTime()
     let response = waitFor handler.handleDocumentFormatting(%1, params)
@@ -3132,11 +3055,10 @@ suite "lsp_handler module tests":
     handler.documents["file:///test.nim"] =
       Document(content: "test content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim"},
-        "options": {"tabSize": 4, "insertSpaces": true},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
 
     expect(LSPError):
       discard waitFor handler.handleDocumentFormatting(%1, params)
@@ -3222,20 +3144,18 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     # Enable diagnostics for this test
     sm.scenarios["default"].diagnostics.enabled = true
-    sm.scenarios["default"].diagnostics.diagnostics =
-      @[
-        DiagnosticContent(
-          range: Range(
-            start: Position(line: 0, character: 0),
-            `end`: Position(line: 0, character: 5),
-          ),
-          severity: 1, # Error
-          message: "Test diagnostic",
-          code: none(string),
-          source: some("lasm"),
-          relatedInformation: @[],
-        )
-      ]
+    sm.scenarios["default"].diagnostics.diagnostics = @[
+      DiagnosticContent(
+        range: Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 5)
+        ),
+        severity: 1, # Error
+        message: "Test diagnostic",
+        code: none(string),
+        source: some("lasm"),
+        relatedInformation: @[],
+      )
+    ]
 
     let handler = newLSPHandler(sm)
 

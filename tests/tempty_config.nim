@@ -57,8 +57,7 @@ suite "empty config path tests":
   test "ScenarioManager with valid config loads scenarios":
     # Create a temporary config file
     let configPath = getTempDir() / "test_config.json"
-    let configContent =
-      """{
+    let configContent = """{
       "currentScenario": "test",
       "scenarios": {
         "test": {
