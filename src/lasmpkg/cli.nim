@@ -25,8 +25,7 @@ proc writeVersion() =
   echo staticReadVersionFromNimble()
 
 proc writeUsage*(isErr: bool = false) =
-  const Text =
-    """
+  const Text = """
 
 Usage:
   lasm --config <path>         # Start LSP server with config file

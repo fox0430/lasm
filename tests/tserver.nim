@@ -96,12 +96,11 @@ suite "server.nim functionality tests":
     # Simulates how server.sendError() would format errors
     let mockTransport = newMockTransport()
 
-    let errorResponse =
-      %*{
-        "jsonrpc": "2.0",
-        "id": 1,
-        "error": {"code": -32601, "message": "Method not found"},
-      }
+    let errorResponse = %*{
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {"code": -32601, "message": "Method not found"},
+    }
 
     let content = $errorResponse
     let header = "Content-Length: " & $content.len & "\r\n\r\n"
@@ -120,12 +119,11 @@ suite "server.nim functionality tests":
     # Simulates how server.sendNotification() would format notifications
     let mockTransport = newMockTransport()
 
-    let notification =
-      %*{
-        "jsonrpc": "2.0",
-        "method": "window/showMessage",
-        "params": {"type": 1, "message": "Test notification"},
-      }
+    let notification = %*{
+      "jsonrpc": "2.0",
+      "method": "window/showMessage",
+      "params": {"type": 1, "message": "Test notification"},
+    }
 
     let content = $notification
     let header = "Content-Length: " & $content.len & "\r\n\r\n"
@@ -175,13 +173,9 @@ suite "server.nim functionality tests":
 
   test "LSP message parsing simulation":
     # Simulates how server.startServer() would parse incoming messages
-    let testMessage =
-      %*{
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {"capabilities": {}},
-      }
+    let testMessage = %*{
+      "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}}
+    }
     let content = $testMessage
     let header = "Content-Length: " & $content.len & "\r\n\r\n"
     let fullMessage = header & content

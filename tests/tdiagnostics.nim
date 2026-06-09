@@ -35,33 +35,32 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 2, character: 10),
-                `end`: Position(line: 2, character: 20),
-              ),
-              severity: 1, # Error
-              code: some("E001"),
-              source: some("lasm"),
-              message: "Undefined variable 'testVar'",
-              tags: @[1],
-              relatedInformation: @[],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 2, character: 10),
+              `end`: Position(line: 2, character: 20),
             ),
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 5, character: 0),
-                `end`: Position(line: 5, character: 5),
-              ),
-              severity: 2, # Warning
-              code: some("W001"),
-              source: some("lasm"),
-              message: "Function 'oldFunc' is deprecated",
-              tags: @[2],
-              relatedInformation: @[],
+            severity: 1, # Error
+            code: some("E001"),
+            source: some("lasm"),
+            message: "Undefined variable 'testVar'",
+            tags: @[1],
+            relatedInformation: @[],
+          ),
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 5, character: 0),
+              `end`: Position(line: 5, character: 5),
             ),
-          ],
+            severity: 2, # Warning
+            code: some("W001"),
+            source: some("lasm"),
+            message: "Function 'oldFunc' is deprecated",
+            tags: @[2],
+            relatedInformation: @[],
+          ),
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
@@ -171,21 +170,20 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 0, character: 0),
-                `end`: Position(line: 0, character: 5),
-              ),
-              severity: 1,
-              code: none(string),
-              source: none(string),
-              message: "Test diagnostic",
-              tags: @[],
-              relatedInformation: @[],
-            )
-          ],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 0, character: 5),
+            ),
+            severity: 1,
+            code: none(string),
+            source: none(string),
+            message: "Test diagnostic",
+            tags: @[],
+            relatedInformation: @[],
+          )
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 50), # 50ms delay
       errors: initTable[string, ErrorConfig](),
@@ -212,21 +210,20 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 1, character: 0),
-                `end`: Position(line: 1, character: 5),
-              ),
-              severity: 1,
-              code: some("E123"),
-              source: some("lasm"),
-              message: "Auto diagnostic message",
-              tags: @[],
-              relatedInformation: @[],
-            )
-          ],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 1, character: 0),
+              `end`: Position(line: 1, character: 5),
+            ),
+            severity: 1,
+            code: some("E123"),
+            source: some("lasm"),
+            message: "Auto diagnostic message",
+            tags: @[],
+            relatedInformation: @[],
+          )
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
@@ -234,15 +231,14 @@ suite "diagnostic functionality tests":
     sm.currentScenario = "auto_diag"
     let handler = newLSPHandler(sm)
 
-    let params =
-      %*{
-        "textDocument": {
-          "uri": "file:///test.nim",
-          "languageId": "nim",
-          "version": 1,
-          "text": "echo \"hello\"",
-        }
+    let params = %*{
+      "textDocument": {
+        "uri": "file:///test.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "echo \"hello\"",
       }
+    }
 
     let notifications = waitFor handler.handleDidOpen(params)
 
@@ -274,21 +270,20 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 0, character: 0),
-                `end`: Position(line: 0, character: 3),
-              ),
-              severity: 2, # Warning
-              code: some("W123"),
-              source: some("lasm"),
-              message: "Change diagnostic message",
-              tags: @[],
-              relatedInformation: @[],
-            )
-          ],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 0, character: 3),
+            ),
+            severity: 2, # Warning
+            code: some("W123"),
+            source: some("lasm"),
+            message: "Change diagnostic message",
+            tags: @[],
+            relatedInformation: @[],
+          )
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
@@ -299,11 +294,10 @@ suite "diagnostic functionality tests":
     # First add a document
     handler.documents["file:///test.nim"] = Document(content: "old content", version: 1)
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.nim", "version": 2},
-        "contentChanges": [{"text": "new content"}],
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim", "version": 2},
+      "contentChanges": [{"text": "new content"}],
+    }
 
     let notifications = waitFor handler.handleDidChange(params)
 
@@ -366,33 +360,31 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 0, character: 0),
-                `end`: Position(line: 0, character: 10),
-              ),
-              severity: 1,
-              code: some("E002"),
-              source: some("lasm"),
-              message: "Main diagnostic with related info",
-              tags: @[],
-              relatedInformation:
-                @[
-                  DiagnosticRelatedInformation(
-                    location: Location(
-                      uri: "file:///related.nim",
-                      range: Range(
-                        start: Position(line: 5, character: 0),
-                        `end`: Position(line: 5, character: 10),
-                      ),
-                    ),
-                    message: "Related issue here",
-                  )
-                ],
-            )
-          ],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 0, character: 10),
+            ),
+            severity: 1,
+            code: some("E002"),
+            source: some("lasm"),
+            message: "Main diagnostic with related info",
+            tags: @[],
+            relatedInformation: @[
+              DiagnosticRelatedInformation(
+                location: Location(
+                  uri: "file:///related.nim",
+                  range: Range(
+                    start: Position(line: 5, character: 0),
+                    `end`: Position(line: 5, character: 10),
+                  ),
+                ),
+                message: "Related issue here",
+              )
+            ],
+          )
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),
@@ -433,21 +425,20 @@ suite "diagnostic functionality tests":
       completion: CompletionConfig(enabled: false, isIncomplete: false, items: @[]),
       diagnostics: DiagnosticConfig(
         enabled: true,
-        diagnostics:
-          @[
-            DiagnosticContent(
-              range: Range(
-                start: Position(line: 1, character: 5),
-                `end`: Position(line: 1, character: 15),
-              ),
-              severity: 3, # Information
-              code: none(string),
-              source: none(string),
-              message: "Minimal diagnostic message",
-              tags: @[],
-              relatedInformation: @[],
-            )
-          ],
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 1, character: 5),
+              `end`: Position(line: 1, character: 15),
+            ),
+            severity: 3, # Information
+            code: none(string),
+            source: none(string),
+            message: "Minimal diagnostic message",
+            tags: @[],
+            relatedInformation: @[],
+          )
+        ],
       ),
       delays: DelayConfig(hover: 0, completion: 0, diagnostics: 0),
       errors: initTable[string, ErrorConfig](),

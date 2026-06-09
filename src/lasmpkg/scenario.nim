@@ -972,357 +972,354 @@ proc listScenarios*(
     result.add((name: name, description: scenario.name))
 
 proc createSampleConfig*(sm: ScenarioManager) =
-  let sampleConfig =
-    %*{
-      "currentScenario": "default",
-      "scenarios": {
-        "default": {
-          "name": "Default Testing",
-          "hover": {
-            "enabled": true,
-            "contents": [
+  let sampleConfig = %*{
+    "currentScenario": "default",
+    "scenarios": {
+      "default": {
+        "name": "Default Testing",
+        "hover": {
+          "enabled": true,
+          "contents": [
+            {
+              "kind": "markdown",
+              "message": "**Default Symbol**\n\nThis is a default test symbol.",
+              "position": {"line": 0, "character": 0},
+            }
+          ],
+        },
+        "completion": {
+          "enabled": true,
+          "isIncomplete": false,
+          "items": [
+            {
+              "label": "println",
+              "kind": 3,
+              "detail": "func println(message: string)",
+              "documentation": "Prints a message to the console",
+              "insertText": "println(${1:message})",
+              "sortText": "1",
+            },
+            {
+              "label": "variable",
+              "kind": 6,
+              "detail": "var variable: int",
+              "documentation": "A sample variable",
+              "insertText": "variable",
+            },
+            {
+              "label": "TestClass",
+              "kind": 7,
+              "detail": "class TestClass",
+              "documentation": "A test class for completion",
+              "insertText": "TestClass",
+            },
+          ],
+        },
+        "diagnostics": {
+          "enabled": true,
+          "diagnostics": [
+            {
+              "range": {
+                "start": {"line": 2, "character": 10},
+                "end": {"line": 2, "character": 20},
+              },
+              "severity": 1,
+              "code": "E001",
+              "source": "lasm",
+              "message": "Undefined variable 'testVar'",
+            },
+            {
+              "range": {
+                "start": {"line": 5, "character": 0}, "end": {"line": 5, "character": 5}
+              },
+              "severity": 2,
+              "code": "W001",
+              "source": "lasm",
+              "message": "Function 'oldFunc' is deprecated",
+              "tags": [2],
+            },
+          ],
+        },
+        "inlayHint": {
+          "enabled": true,
+          "hints": [
+            {
+              "position": {"line": 1, "character": 20},
+              "label": ": string",
+              "kind": 1,
+              "tooltip": "Type annotation for parameter",
+              "paddingLeft": false,
+              "paddingRight": false,
+            },
+            {
+              "position": {"line": 3, "character": 15},
+              "label": " -> void",
+              "kind": 1,
+              "tooltip": "Return type annotation",
+              "paddingLeft": true,
+              "paddingRight": false,
+            },
+          ],
+        },
+        "delays": {
+          "completion": 100,
+          "diagnostics": 200,
+          "hover": 50,
+          "semanticTokens": 30,
+          "inlayHint": 25,
+          "declaration": 40,
+          "definition": 35,
+          "typeDefinition": 30,
+          "implementation": 35,
+          "references": 50,
+          "documentHighlight": 45,
+          "rename": 60,
+          "formatting": 40,
+        },
+        "semanticTokens": {
+          "enabled": true,
+          "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+        },
+        "declaration": {
+          "enabled": true,
+          "location": {
+            "uri": "file:///path/to/declaration.nim",
+            "range": {
+              "start": {"line": 10, "character": 5},
+              "end": {"line": 10, "character": 15},
+            },
+          },
+        },
+        "definition": {
+          "enabled": true,
+          "location": {
+            "uri": "file:///path/to/implementation.nim",
+            "range": {
+              "start": {"line": 25, "character": 2},
+              "end": {"line": 25, "character": 12},
+            },
+          },
+        },
+        "typeDefinition": {
+          "enabled": true,
+          "location": {
+            "uri": "file:///path/to/type.nim",
+            "range": {
+              "start": {"line": 8, "character": 0}, "end": {"line": 8, "character": 10}
+            },
+          },
+        },
+        "implementation": {
+          "enabled": true,
+          "location": {
+            "uri": "file:///path/to/implementation.nim",
+            "range": {
+              "start": {"line": 30, "character": 0},
+              "end": {"line": 30, "character": 20},
+            },
+          },
+        },
+        "references": {
+          "enabled": true,
+          "includeDeclaration": true,
+          "locations": [
+            {
+              "uri": "file:///path/to/reference1.nim",
+              "range": {
+                "start": {"line": 15, "character": 8},
+                "end": {"line": 15, "character": 18},
+              },
+            },
+            {
+              "uri": "file:///path/to/reference2.nim",
+              "range": {
+                "start": {"line": 42, "character": 12},
+                "end": {"line": 42, "character": 22},
+              },
+            },
+          ],
+        },
+        "documentHighlight": {
+          "enabled": true,
+          "highlights": [
+            {
+              "range": {
+                "start": {"line": 10, "character": 5},
+                "end": {"line": 10, "character": 15},
+              },
+              "kind": 1,
+            },
+            {
+              "range": {
+                "start": {"line": 20, "character": 8},
+                "end": {"line": 20, "character": 18},
+              },
+              "kind": 2,
+            },
+            {
+              "range": {
+                "start": {"line": 25, "character": 12},
+                "end": {"line": 25, "character": 22},
+              },
+              "kind": 3,
+            },
+          ],
+        },
+        "rename": {
+          "enabled": true,
+          "workspaceEdit": {
+            "changes": [
               {
-                "kind": "markdown",
-                "message": "**Default Symbol**\n\nThis is a default test symbol.",
-                "position": {"line": 0, "character": 0},
+                "uri": "file:///path/to/file.nim",
+                "edits": [
+                  {
+                    "range": {
+                      "start": {"line": 5, "character": 10},
+                      "end": {"line": 5, "character": 18},
+                    },
+                    "newText": "${newName}",
+                  },
+                  {
+                    "range": {
+                      "start": {"line": 12, "character": 5},
+                      "end": {"line": 12, "character": 13},
+                    },
+                    "newText": "${newName}",
+                  },
+                ],
+              }
+            ],
+            "documentChanges": [
+              {
+                "textDocument": {"uri": "file:///path/to/other.nim", "version": 1},
+                "edits": [
+                  {
+                    "range": {
+                      "start": {"line": 3, "character": 8},
+                      "end": {"line": 3, "character": 16},
+                    },
+                    "newText": "${newName}",
+                  }
+                ],
               }
             ],
           },
-          "completion": {
-            "enabled": true,
-            "isIncomplete": false,
-            "items": [
-              {
-                "label": "println",
-                "kind": 3,
-                "detail": "func println(message: string)",
-                "documentation": "Prints a message to the console",
-                "insertText": "println(${1:message})",
-                "sortText": "1",
+        },
+        "formatting": {
+          "enabled": true,
+          "edits": [
+            {
+              "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 20},
               },
-              {
-                "label": "variable",
-                "kind": 6,
-                "detail": "var variable: int",
-                "documentation": "A sample variable",
-                "insertText": "variable",
+              "newText": "function formattedFunction() {",
+            },
+            {
+              "range": {
+                "start": {"line": 5, "character": 2},
+                "end": {"line": 5, "character": 10},
               },
-              {
-                "label": "TestClass",
-                "kind": 7,
-                "detail": "class TestClass",
-                "documentation": "A test class for completion",
-                "insertText": "TestClass",
+              "newText": "    return;",
+            },
+          ],
+        },
+      },
+      "multi-location-testing": {
+        "name": "Multi-location Definition Testing",
+        "hover": {"enabled": false},
+        "completion": {"enabled": false},
+        "diagnostics": {"enabled": false},
+        "semanticTokens": {"enabled": false},
+        "inlayHint": {"enabled": false},
+        "declaration": {
+          "enabled": true,
+          "locations": [
+            {
+              "uri": "file:///path/to/interface1.nim",
+              "range": {
+                "start": {"line": 5, "character": 10},
+                "end": {"line": 5, "character": 20},
               },
-            ],
-          },
-          "diagnostics": {
-            "enabled": true,
-            "diagnostics": [
-              {
-                "range": {
-                  "start": {"line": 2, "character": 10},
-                  "end": {"line": 2, "character": 20},
-                },
-                "severity": 1,
-                "code": "E001",
-                "source": "lasm",
-                "message": "Undefined variable 'testVar'",
+            },
+            {
+              "uri": "file:///path/to/interface2.nim",
+              "range": {
+                "start": {"line": 8, "character": 2},
+                "end": {"line": 8, "character": 12},
               },
-              {
-                "range": {
-                  "start": {"line": 5, "character": 0},
-                  "end": {"line": 5, "character": 5},
-                },
-                "severity": 2,
-                "code": "W001",
-                "source": "lasm",
-                "message": "Function 'oldFunc' is deprecated",
-                "tags": [2],
+            },
+          ],
+        },
+        "definition": {
+          "enabled": true,
+          "locations": [
+            {
+              "uri": "file:///path/to/implementation1.nim",
+              "range": {
+                "start": {"line": 15, "character": 4},
+                "end": {"line": 15, "character": 14},
               },
-            ],
-          },
-          "inlayHint": {
-            "enabled": true,
-            "hints": [
-              {
-                "position": {"line": 1, "character": 20},
-                "label": ": string",
-                "kind": 1,
-                "tooltip": "Type annotation for parameter",
-                "paddingLeft": false,
-                "paddingRight": false,
+            },
+            {
+              "uri": "file:///path/to/implementation2.nim",
+              "range": {
+                "start": {"line": 20, "character": 6},
+                "end": {"line": 20, "character": 16},
               },
-              {
-                "position": {"line": 3, "character": 15},
-                "label": " -> void",
-                "kind": 1,
-                "tooltip": "Return type annotation",
-                "paddingLeft": true,
-                "paddingRight": false,
+            },
+          ],
+        },
+        "implementation": {
+          "enabled": true,
+          "locations": [
+            {
+              "uri": "file:///path/to/implementation1.nim",
+              "range": {
+                "start": {"line": 25, "character": 0},
+                "end": {"line": 25, "character": 15},
               },
-            ],
-          },
-          "delays": {
-            "completion": 100,
-            "diagnostics": 200,
-            "hover": 50,
-            "semanticTokens": 30,
-            "inlayHint": 25,
-            "declaration": 40,
-            "definition": 35,
-            "typeDefinition": 30,
-            "implementation": 35,
-            "references": 50,
-            "documentHighlight": 45,
-            "rename": 60,
-            "formatting": 40,
-          },
-          "semanticTokens": {
-            "enabled": true,
-            "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
-          },
-          "declaration": {
-            "enabled": true,
-            "location": {
-              "uri": "file:///path/to/declaration.nim",
+            },
+            {
+              "uri": "file:///path/to/implementation2.nim",
+              "range": {
+                "start": {"line": 30, "character": 2},
+                "end": {"line": 30, "character": 17},
+              },
+            },
+          ],
+        },
+        "references": {
+          "enabled": true,
+          "includeDeclaration": false,
+          "locations": [
+            {
+              "uri": "file:///path/to/multi-ref1.nim",
               "range": {
                 "start": {"line": 10, "character": 5},
                 "end": {"line": 10, "character": 15},
               },
             },
-          },
-          "definition": {
-            "enabled": true,
-            "location": {
-              "uri": "file:///path/to/implementation.nim",
+            {
+              "uri": "file:///path/to/multi-ref2.nim",
               "range": {
-                "start": {"line": 25, "character": 2},
-                "end": {"line": 25, "character": 12},
+                "start": {"line": 22, "character": 3},
+                "end": {"line": 22, "character": 13},
               },
             },
-          },
-          "typeDefinition": {
-            "enabled": true,
-            "location": {
-              "uri": "file:///path/to/type.nim",
+            {
+              "uri": "file:///path/to/multi-ref3.nim",
               "range": {
-                "start": {"line": 8, "character": 0},
-                "end": {"line": 8, "character": 10},
+                "start": {"line": 35, "character": 7},
+                "end": {"line": 35, "character": 17},
               },
             },
-          },
-          "implementation": {
-            "enabled": true,
-            "location": {
-              "uri": "file:///path/to/implementation.nim",
-              "range": {
-                "start": {"line": 30, "character": 0},
-                "end": {"line": 30, "character": 20},
-              },
-            },
-          },
-          "references": {
-            "enabled": true,
-            "includeDeclaration": true,
-            "locations": [
-              {
-                "uri": "file:///path/to/reference1.nim",
-                "range": {
-                  "start": {"line": 15, "character": 8},
-                  "end": {"line": 15, "character": 18},
-                },
-              },
-              {
-                "uri": "file:///path/to/reference2.nim",
-                "range": {
-                  "start": {"line": 42, "character": 12},
-                  "end": {"line": 42, "character": 22},
-                },
-              },
-            ],
-          },
-          "documentHighlight": {
-            "enabled": true,
-            "highlights": [
-              {
-                "range": {
-                  "start": {"line": 10, "character": 5},
-                  "end": {"line": 10, "character": 15},
-                },
-                "kind": 1,
-              },
-              {
-                "range": {
-                  "start": {"line": 20, "character": 8},
-                  "end": {"line": 20, "character": 18},
-                },
-                "kind": 2,
-              },
-              {
-                "range": {
-                  "start": {"line": 25, "character": 12},
-                  "end": {"line": 25, "character": 22},
-                },
-                "kind": 3,
-              },
-            ],
-          },
-          "rename": {
-            "enabled": true,
-            "workspaceEdit": {
-              "changes": [
-                {
-                  "uri": "file:///path/to/file.nim",
-                  "edits": [
-                    {
-                      "range": {
-                        "start": {"line": 5, "character": 10},
-                        "end": {"line": 5, "character": 18},
-                      },
-                      "newText": "${newName}",
-                    },
-                    {
-                      "range": {
-                        "start": {"line": 12, "character": 5},
-                        "end": {"line": 12, "character": 13},
-                      },
-                      "newText": "${newName}",
-                    },
-                  ],
-                }
-              ],
-              "documentChanges": [
-                {
-                  "textDocument": {"uri": "file:///path/to/other.nim", "version": 1},
-                  "edits": [
-                    {
-                      "range": {
-                        "start": {"line": 3, "character": 8},
-                        "end": {"line": 3, "character": 16},
-                      },
-                      "newText": "${newName}",
-                    }
-                  ],
-                }
-              ],
-            },
-          },
-          "formatting": {
-            "enabled": true,
-            "edits": [
-              {
-                "range": {
-                  "start": {"line": 1, "character": 0},
-                  "end": {"line": 1, "character": 20},
-                },
-                "newText": "function formattedFunction() {",
-              },
-              {
-                "range": {
-                  "start": {"line": 5, "character": 2},
-                  "end": {"line": 5, "character": 10},
-                },
-                "newText": "    return;",
-              },
-            ],
-          },
+          ],
         },
-        "multi-location-testing": {
-          "name": "Multi-location Definition Testing",
-          "hover": {"enabled": false},
-          "completion": {"enabled": false},
-          "diagnostics": {"enabled": false},
-          "semanticTokens": {"enabled": false},
-          "inlayHint": {"enabled": false},
-          "declaration": {
-            "enabled": true,
-            "locations": [
-              {
-                "uri": "file:///path/to/interface1.nim",
-                "range": {
-                  "start": {"line": 5, "character": 10},
-                  "end": {"line": 5, "character": 20},
-                },
-              },
-              {
-                "uri": "file:///path/to/interface2.nim",
-                "range": {
-                  "start": {"line": 8, "character": 2},
-                  "end": {"line": 8, "character": 12},
-                },
-              },
-            ],
-          },
-          "definition": {
-            "enabled": true,
-            "locations": [
-              {
-                "uri": "file:///path/to/implementation1.nim",
-                "range": {
-                  "start": {"line": 15, "character": 4},
-                  "end": {"line": 15, "character": 14},
-                },
-              },
-              {
-                "uri": "file:///path/to/implementation2.nim",
-                "range": {
-                  "start": {"line": 20, "character": 6},
-                  "end": {"line": 20, "character": 16},
-                },
-              },
-            ],
-          },
-          "implementation": {
-            "enabled": true,
-            "locations": [
-              {
-                "uri": "file:///path/to/implementation1.nim",
-                "range": {
-                  "start": {"line": 25, "character": 0},
-                  "end": {"line": 25, "character": 15},
-                },
-              },
-              {
-                "uri": "file:///path/to/implementation2.nim",
-                "range": {
-                  "start": {"line": 30, "character": 2},
-                  "end": {"line": 30, "character": 17},
-                },
-              },
-            ],
-          },
-          "references": {
-            "enabled": true,
-            "includeDeclaration": false,
-            "locations": [
-              {
-                "uri": "file:///path/to/multi-ref1.nim",
-                "range": {
-                  "start": {"line": 10, "character": 5},
-                  "end": {"line": 10, "character": 15},
-                },
-              },
-              {
-                "uri": "file:///path/to/multi-ref2.nim",
-                "range": {
-                  "start": {"line": 22, "character": 3},
-                  "end": {"line": 22, "character": 13},
-                },
-              },
-              {
-                "uri": "file:///path/to/multi-ref3.nim",
-                "range": {
-                  "start": {"line": 35, "character": 7},
-                  "end": {"line": 35, "character": 17},
-                },
-              },
-            ],
-          },
-          "delays": {},
-        },
+        "delays": {},
       },
-    }
+    },
+  }
 
   let configPath = getCurrentDir() / "lsp-test-config-sample.json"
   writeFile(configPath, pretty(sampleConfig, 2))

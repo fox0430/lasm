@@ -43,11 +43,10 @@ suite "Cancellable request handlers tests":
   test "handleHover with cancellation support":
     let server = createTestServer()
     let requestId = %42
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
 
     # Start hover request
     let hoverFuture = server.handleHover(requestId, params)
@@ -67,11 +66,10 @@ suite "Cancellable request handlers tests":
   test "handleHover cancellation during processing":
     let server = createTestServer()
     let requestId = %100
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
 
     # Start hover request
     let hoverFuture = server.handleHover(requestId, params)
@@ -94,11 +92,10 @@ suite "Cancellable request handlers tests":
   test "handleCompletion with cancellation support":
     let server = createTestServer()
     let requestId = %200
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 5},
+    }
 
     # Start completion request
     let completionFuture = server.handleCompletion(requestId, params)
@@ -112,11 +109,10 @@ suite "Cancellable request handlers tests":
   test "handleCompletion cancellation":
     let server = createTestServer()
     let requestId = %201
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 5},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 5},
+    }
 
     # Start and immediately cancel
     let completionFuture = server.handleCompletion(requestId, params)
@@ -134,11 +130,10 @@ suite "Cancellable request handlers tests":
   test "handleDefinition with cancellation support":
     let server = createTestServer()
     let requestId = %300
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 2, "character": 10},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 2, "character": 10},
+    }
 
     let definitionFuture = server.handleDefinition(requestId, params)
 
@@ -162,16 +157,14 @@ suite "Cancellable request handlers tests":
   test "Multiple handlers with same ID (should not happen but test robustness)":
     let server = createTestServer()
     let requestId = %500
-    let hoverParams =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
-    let completionParams =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 5},
-      }
+    let hoverParams = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
+    let completionParams = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 5},
+    }
 
     # Start two requests with same ID (unusual but should handle gracefully)
     let hoverFuture = server.handleHover(requestId, hoverParams)
@@ -188,11 +181,10 @@ suite "Cancellable request handlers tests":
   test "Cancellation after natural completion":
     let server = createTestServer()
     let requestId = %600
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
 
     # Complete request naturally
     let hoverFuture = server.handleHover(requestId, params)
@@ -206,11 +198,10 @@ suite "Cancellable request handlers tests":
     # This tests the template indirectly through handler usage
     let server = createTestServer()
     let requestId = %700
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
 
     # The template should:
     # 1. Add request to pending
@@ -251,11 +242,10 @@ suite "Cancellable request handlers tests":
     var futures: seq[Future[void]] = @[]
     for i in 1 .. 5:
       let requestId = %i
-      let params =
-        %*{
-          "textDocument": {"uri": "file:///test.txt"},
-          "position": {"line": i, "character": 0},
-        }
+      let params = %*{
+        "textDocument": {"uri": "file:///test.txt"},
+        "position": {"line": i, "character": 0},
+      }
       futures.add(server.handleHover(requestId, params))
 
     # Cancel them all rapidly
@@ -278,11 +268,10 @@ suite "Cancellable request handlers tests":
     let stringId = %"test-request"
     let floatId = %3.14
 
-    let params =
-      %*{
-        "textDocument": {"uri": "file:///test.txt"},
-        "position": {"line": 0, "character": 0},
-      }
+    let params = %*{
+      "textDocument": {"uri": "file:///test.txt"},
+      "position": {"line": 0, "character": 0},
+    }
 
     # Start requests with different ID types
     let future1 = server.handleHover(numericId, params)

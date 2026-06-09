@@ -98,23 +98,22 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "test",
-        "scenarios": {
-          "test": {
-            "name": "Test Scenario",
-            "hover": {
-              "enabled": true,
-              "content": {"kind": "markdown", "message": "Test hover message"},
-            },
-            "completion": {"enabled": false, "items": []},
-            "delays":
-              {"hover": 50, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-            "errors": {"hover": {"code": -32603, "message": "Test error"}},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "test",
+      "scenarios": {
+        "test": {
+          "name": "Test Scenario",
+          "hover": {
+            "enabled": true,
+            "content": {"kind": "markdown", "message": "Test hover message"},
+          },
+          "completion": {"enabled": false, "items": []},
+          "delays":
+            {"hover": 50, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+          "errors": {"hover": {"code": -32603, "message": "Test error"}},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -140,29 +139,28 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_config_contents.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "multiContent",
-        "scenarios": {
-          "multiContent": {
-            "name": "Multi Content Scenario",
-            "hover": {
-              "enabled": true,
-              "contents": [
-                {
-                  "kind": "markdown",
-                  "message": "First content",
-                  "position": {"line": 0, "character": 0},
-                },
-                {"kind": "plaintext", "message": "Second content"},
-              ],
-            },
-            "completion": {"enabled": false, "items": []},
-            "delays":
-              {"hover": 25, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "multiContent",
+      "scenarios": {
+        "multiContent": {
+          "name": "Multi Content Scenario",
+          "hover": {
+            "enabled": true,
+            "contents": [
+              {
+                "kind": "markdown",
+                "message": "First content",
+                "position": {"line": 0, "character": 0},
+              },
+              {"kind": "plaintext", "message": "Second content"},
+            ],
+          },
+          "completion": {"enabled": false, "items": []},
+          "delays":
+            {"hover": 25, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -605,14 +603,12 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "no_current_scenario.json"
 
-    let testConfig =
-      %*{
-        "scenarios": {
-          "test": {
-            "name": "Test Scenario", "hover": {"enabled": false}, "delays": {"hover": 0}
-          }
-        }
+    let testConfig = %*{
+      "scenarios": {
+        "test":
+          {"name": "Test Scenario", "hover": {"enabled": false}, "delays": {"hover": 0}}
       }
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -651,58 +647,57 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_diagnostic_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "diagnostic_test",
-        "scenarios": {
-          "diagnostic_test": {
-            "name": "Diagnostic Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {
-              "enabled": true,
-              "diagnostics": [
-                {
-                  "range": {
-                    "start": {"line": 2, "character": 10},
-                    "end": {"line": 2, "character": 20},
-                  },
-                  "severity": 1,
-                  "code": "E001",
-                  "source": "lasm",
-                  "message": "Undefined variable 'testVar'",
-                  "tags": [1],
+    let testConfig = %*{
+      "currentScenario": "diagnostic_test",
+      "scenarios": {
+        "diagnostic_test": {
+          "name": "Diagnostic Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {
+            "enabled": true,
+            "diagnostics": [
+              {
+                "range": {
+                  "start": {"line": 2, "character": 10},
+                  "end": {"line": 2, "character": 20},
                 },
-                {
-                  "range": {
-                    "start": {"line": 5, "character": 0},
-                    "end": {"line": 5, "character": 5},
-                  },
-                  "severity": 2,
-                  "code": "W001",
-                  "source": "lasm",
-                  "message": "Function 'oldFunc' is deprecated",
-                  "tags": [2],
-                  "relatedInformation": [
-                    {
-                      "location": {
-                        "uri": "file:///related.py",
-                        "range": {
-                          "start": {"line": 10, "character": 0},
-                          "end": {"line": 10, "character": 10},
-                        },
+                "severity": 1,
+                "code": "E001",
+                "source": "lasm",
+                "message": "Undefined variable 'testVar'",
+                "tags": [1],
+              },
+              {
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 5, "character": 5},
+                },
+                "severity": 2,
+                "code": "W001",
+                "source": "lasm",
+                "message": "Function 'oldFunc' is deprecated",
+                "tags": [2],
+                "relatedInformation": [
+                  {
+                    "location": {
+                      "uri": "file:///related.py",
+                      "range": {
+                        "start": {"line": 10, "character": 0},
+                        "end": {"line": 10, "character": 10},
                       },
-                      "message": "New function available here",
-                    }
-                  ],
-                },
-              ],
-            },
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 150, "semanticTokens": 0},
-          }
-        },
-      }
+                    },
+                    "message": "New function available here",
+                  }
+                ],
+              },
+            ],
+          },
+          "delays":
+            {"hover": 0, "completion": 0, "diagnostics": 150, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -755,20 +750,18 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_diagnostic_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_diagnostics",
-        "scenarios": {
-          "no_diagnostics": {
-            "name": "No Diagnostics Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false},
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_diagnostics",
+      "scenarios": {
+        "no_diagnostics": {
+          "name": "No Diagnostics Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false},
+          "delays": {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -786,19 +779,17 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_diagnostic_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_diag_config",
-        "scenarios": {
-          "no_diag_config": {
-            "name": "No Diagnostic Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_diag_config",
+      "scenarios": {
+        "no_diag_config": {
+          "name": "No Diagnostic Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "delays": {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -816,23 +807,20 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_diagnostic_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_diag",
-        "scenarios": {
-          "minimal_diag": {
-            "name": "Minimal Diagnostic Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {
-              "enabled": true,
-              "diagnostics": [{"message": "Simple error", "severity": 1}],
-            },
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "minimal_diag",
+      "scenarios": {
+        "minimal_diag": {
+          "name": "Minimal Diagnostic Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {
+            "enabled": true, "diagnostics": [{"message": "Simple error", "severity": 1}]
+          },
+          "delays": {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -864,24 +852,23 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_semantic_tokens_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "semantic_tokens_test",
-        "scenarios": {
-          "semantic_tokens_test": {
-            "name": "Semantic Tokens Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {
-              "enabled": true,
-              "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
-            },
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 50},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "semantic_tokens_test",
+      "scenarios": {
+        "semantic_tokens_test": {
+          "name": "Semantic Tokens Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {
+            "enabled": true,
+            "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+          },
+          "delays":
+            {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 50},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -911,21 +898,19 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_semantic_tokens_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_semantic_tokens",
-        "scenarios": {
-          "no_semantic_tokens": {
-            "name": "No Semantic Tokens Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false},
-            "delays":
-              {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_semantic_tokens",
+      "scenarios": {
+        "no_semantic_tokens": {
+          "name": "No Semantic Tokens Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false},
+          "delays": {"hover": 0, "completion": 0, "diagnostics": 0, "semanticTokens": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -943,25 +928,24 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_semantic_tokens_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_semantic_config",
-        "scenarios": {
-          "no_semantic_config": {
-            "name": "No Semantic Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_semantic_config",
+      "scenarios": {
+        "no_semantic_config": {
+          "name": "No Semantic Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1011,56 +995,55 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_inlay_hint_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "inlay_hint_test",
-        "scenarios": {
-          "inlay_hint_test": {
-            "name": "Inlay Hint Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {
-              "enabled": true,
-              "hints": [
-                {
-                  "position": {"line": 1, "character": 20},
-                  "label": ": string",
-                  "kind": 1,
-                  "tooltip": "Type annotation for parameter",
-                  "paddingLeft": false,
-                  "paddingRight": false,
-                  "textEdits": [
-                    {
-                      "range": {
-                        "start": {"line": 1, "character": 15},
-                        "end": {"line": 1, "character": 20},
-                      },
-                      "newText": "param",
-                    }
-                  ],
-                },
-                {
-                  "position": {"line": 3, "character": 15},
-                  "label": " -> void",
-                  "kind": 1,
-                  "tooltip": "Return type annotation",
-                  "paddingLeft": true,
-                  "paddingRight": false,
-                },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 75,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "inlay_hint_test",
+      "scenarios": {
+        "inlay_hint_test": {
+          "name": "Inlay Hint Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {
+            "enabled": true,
+            "hints": [
+              {
+                "position": {"line": 1, "character": 20},
+                "label": ": string",
+                "kind": 1,
+                "tooltip": "Type annotation for parameter",
+                "paddingLeft": false,
+                "paddingRight": false,
+                "textEdits": [
+                  {
+                    "range": {
+                      "start": {"line": 1, "character": 15},
+                      "end": {"line": 1, "character": 20},
+                    },
+                    "newText": "param",
+                  }
+                ],
+              },
+              {
+                "position": {"line": 3, "character": 15},
+                "label": " -> void",
+                "kind": 1,
+                "tooltip": "Return type annotation",
+                "paddingLeft": true,
+                "paddingRight": false,
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 75,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1108,27 +1091,26 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_inlay_hint_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_inlay_hints",
-        "scenarios": {
-          "no_inlay_hints": {
-            "name": "No Inlay Hints Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_inlay_hints",
+      "scenarios": {
+        "no_inlay_hints": {
+          "name": "No Inlay Hints Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1146,26 +1128,25 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_inlay_hint_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_inlay_config",
-        "scenarios": {
-          "no_inlay_config": {
-            "name": "No Inlay Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_inlay_config",
+      "scenarios": {
+        "no_inlay_config": {
+          "name": "No Inlay Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1183,30 +1164,29 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_inlay_hint_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_inlay",
-        "scenarios": {
-          "minimal_inlay": {
-            "name": "Minimal Inlay Hint Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {
-              "enabled": true,
-              "hints": [{"position": {"line": 0, "character": 10}, "label": ": int"}],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "minimal_inlay",
+      "scenarios": {
+        "minimal_inlay": {
+          "name": "Minimal Inlay Hint Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {
+            "enabled": true,
+            "hints": [{"position": {"line": 0, "character": 10}, "label": ": int"}],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1256,54 +1236,53 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_declaration_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "declaration_test",
-        "scenarios": {
-          "declaration_test": {
-            "name": "Declaration Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///single_declaration.nim",
+    let testConfig = %*{
+      "currentScenario": "declaration_test",
+      "scenarios": {
+        "declaration_test": {
+          "name": "Declaration Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///single_declaration.nim",
+              "range": {
+                "start": {"line": 10, "character": 5},
+                "end": {"line": 10, "character": 15},
+              },
+            },
+            "locations": [
+              {
+                "uri": "file:///multi_declaration1.nim",
                 "range": {
-                  "start": {"line": 10, "character": 5},
-                  "end": {"line": 10, "character": 15},
+                  "start": {"line": 3, "character": 0},
+                  "end": {"line": 3, "character": 10},
                 },
               },
-              "locations": [
-                {
-                  "uri": "file:///multi_declaration1.nim",
-                  "range": {
-                    "start": {"line": 3, "character": 0},
-                    "end": {"line": 3, "character": 10},
-                  },
+              {
+                "uri": "file:///multi_declaration2.nim",
+                "range": {
+                  "start": {"line": 7, "character": 5},
+                  "end": {"line": 7, "character": 15},
                 },
-                {
-                  "uri": "file:///multi_declaration2.nim",
-                  "range": {
-                    "start": {"line": 7, "character": 5},
-                    "end": {"line": 7, "character": 15},
-                  },
-                },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 100,
-            },
-          }
-        },
-      }
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 100,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1348,29 +1327,28 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_declaration_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_declaration",
-        "scenarios": {
-          "no_declaration": {
-            "name": "No Declaration Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_declaration",
+      "scenarios": {
+        "no_declaration": {
+          "name": "No Declaration Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1389,28 +1367,27 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_declaration_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_decl_config",
-        "scenarios": {
-          "no_decl_config": {
-            "name": "No Declaration Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_decl_config",
+      "scenarios": {
+        "no_decl_config": {
+          "name": "No Declaration Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1429,38 +1406,37 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_declaration_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_decl",
-        "scenarios": {
-          "minimal_decl": {
-            "name": "Minimal Declaration Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///minimal.nim",
-                "range": {
-                  "start": {"line": 0, "character": 0},
-                  "end": {"line": 0, "character": 10},
-                },
+    let testConfig = %*{
+      "currentScenario": "minimal_decl",
+      "scenarios": {
+        "minimal_decl": {
+          "name": "Minimal Declaration Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///minimal.nim",
+              "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": 0, "character": 10},
               },
             },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-            },
-          }
-        },
-      }
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1506,56 +1482,55 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "definition_test",
-        "scenarios": {
-          "definition_test": {
-            "name": "Definition Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///single_definition.nim",
+    let testConfig = %*{
+      "currentScenario": "definition_test",
+      "scenarios": {
+        "definition_test": {
+          "name": "Definition Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///single_definition.nim",
+              "range": {
+                "start": {"line": 25, "character": 2},
+                "end": {"line": 25, "character": 12},
+              },
+            },
+            "locations": [
+              {
+                "uri": "file:///multi_definition1.nim",
                 "range": {
-                  "start": {"line": 25, "character": 2},
-                  "end": {"line": 25, "character": 12},
+                  "start": {"line": 10, "character": 4},
+                  "end": {"line": 10, "character": 14},
                 },
               },
-              "locations": [
-                {
-                  "uri": "file:///multi_definition1.nim",
-                  "range": {
-                    "start": {"line": 10, "character": 4},
-                    "end": {"line": 10, "character": 14},
-                  },
+              {
+                "uri": "file:///multi_definition2.nim",
+                "range": {
+                  "start": {"line": 20, "character": 8},
+                  "end": {"line": 20, "character": 18},
                 },
-                {
-                  "uri": "file:///multi_definition2.nim",
-                  "range": {
-                    "start": {"line": 20, "character": 8},
-                    "end": {"line": 20, "character": 18},
-                  },
-                },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 90,
-            },
-          }
-        },
-      }
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 90,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1600,31 +1575,30 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_definition",
-        "scenarios": {
-          "no_definition": {
-            "name": "No Definition Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_definition",
+      "scenarios": {
+        "no_definition": {
+          "name": "No Definition Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1643,30 +1617,29 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_def_config",
-        "scenarios": {
-          "no_def_config": {
-            "name": "No Definition Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_def_config",
+      "scenarios": {
+        "no_def_config": {
+          "name": "No Definition Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1685,40 +1658,39 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_def",
-        "scenarios": {
-          "minimal_def": {
-            "name": "Minimal Definition Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///minimal.nim",
-                "range": {
-                  "start": {"line": 5, "character": 0},
-                  "end": {"line": 5, "character": 10},
-                },
+    let testConfig = %*{
+      "currentScenario": "minimal_def",
+      "scenarios": {
+        "minimal_def": {
+          "name": "Minimal Definition Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///minimal.nim",
+              "range": {
+                "start": {"line": 5, "character": 0},
+                "end": {"line": 5, "character": 10},
               },
             },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-            },
-          }
-        },
-      }
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1765,58 +1737,57 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_type_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "type_definition_test",
-        "scenarios": {
-          "type_definition_test": {
-            "name": "Type Definition Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///single_type_definition.nim",
+    let testConfig = %*{
+      "currentScenario": "type_definition_test",
+      "scenarios": {
+        "type_definition_test": {
+          "name": "Type Definition Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///single_type_definition.nim",
+              "range": {
+                "start": {"line": 8, "character": 0},
+                "end": {"line": 8, "character": 10},
+              },
+            },
+            "locations": [
+              {
+                "uri": "file:///multi_type_definition1.nim",
                 "range": {
-                  "start": {"line": 8, "character": 0},
-                  "end": {"line": 8, "character": 10},
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 5, "character": 15},
                 },
               },
-              "locations": [
-                {
-                  "uri": "file:///multi_type_definition1.nim",
-                  "range": {
-                    "start": {"line": 5, "character": 0},
-                    "end": {"line": 5, "character": 15},
-                  },
+              {
+                "uri": "file:///multi_type_definition2.nim",
+                "range": {
+                  "start": {"line": 12, "character": 5},
+                  "end": {"line": 12, "character": 20},
                 },
-                {
-                  "uri": "file:///multi_type_definition2.nim",
-                  "range": {
-                    "start": {"line": 12, "character": 5},
-                    "end": {"line": 12, "character": 20},
-                  },
-                },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 120,
-            },
-          }
-        },
-      }
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 120,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1861,33 +1832,32 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_type_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_type_definition",
-        "scenarios": {
-          "no_type_definition": {
-            "name": "No Type Definition Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_type_definition",
+      "scenarios": {
+        "no_type_definition": {
+          "name": "No Type Definition Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1906,32 +1876,31 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_type_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_type_def_config",
-        "scenarios": {
-          "no_type_def_config": {
-            "name": "No Type Definition Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_type_def_config",
+      "scenarios": {
+        "no_type_def_config": {
+          "name": "No Type Definition Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -1950,42 +1919,41 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_type_definition_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_type_def",
-        "scenarios": {
-          "minimal_type_def": {
-            "name": "Minimal Type Definition Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///minimal_type.nim",
-                "range": {
-                  "start": {"line": 3, "character": 5},
-                  "end": {"line": 3, "character": 15},
-                },
+    let testConfig = %*{
+      "currentScenario": "minimal_type_def",
+      "scenarios": {
+        "minimal_type_def": {
+          "name": "Minimal Type Definition Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///minimal_type.nim",
+              "range": {
+                "start": {"line": 3, "character": 5},
+                "end": {"line": 3, "character": 15},
               },
             },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-            },
-          }
-        },
-      }
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2056,60 +2024,59 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_implementation_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "implementation_test",
-        "scenarios": {
-          "implementation_test": {
-            "name": "Implementation Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///single_implementation.nim",
+    let testConfig = %*{
+      "currentScenario": "implementation_test",
+      "scenarios": {
+        "implementation_test": {
+          "name": "Implementation Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///single_implementation.nim",
+              "range": {
+                "start": {"line": 18, "character": 4},
+                "end": {"line": 18, "character": 14},
+              },
+            },
+            "locations": [
+              {
+                "uri": "file:///multi_implementation1.nim",
                 "range": {
-                  "start": {"line": 18, "character": 4},
-                  "end": {"line": 18, "character": 14},
+                  "start": {"line": 6, "character": 2},
+                  "end": {"line": 6, "character": 12},
                 },
               },
-              "locations": [
-                {
-                  "uri": "file:///multi_implementation1.nim",
-                  "range": {
-                    "start": {"line": 6, "character": 2},
-                    "end": {"line": 6, "character": 12},
-                  },
+              {
+                "uri": "file:///multi_implementation2.nim",
+                "range": {
+                  "start": {"line": 15, "character": 8},
+                  "end": {"line": 15, "character": 18},
                 },
-                {
-                  "uri": "file:///multi_implementation2.nim",
-                  "range": {
-                    "start": {"line": 15, "character": 8},
-                    "end": {"line": 15, "character": 18},
-                  },
-                },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 110,
-            },
-          }
-        },
-      }
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 110,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2154,35 +2121,34 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_implementation_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_implementation",
-        "scenarios": {
-          "no_implementation": {
-            "name": "No Implementation Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_implementation",
+      "scenarios": {
+        "no_implementation": {
+          "name": "No Implementation Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2201,34 +2167,33 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_implementation_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_impl_config",
-        "scenarios": {
-          "no_impl_config": {
-            "name": "No Implementation Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_impl_config",
+      "scenarios": {
+        "no_impl_config": {
+          "name": "No Implementation Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2247,44 +2212,43 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_implementation_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_impl",
-        "scenarios": {
-          "minimal_impl": {
-            "name": "Minimal Implementation Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {
-              "enabled": true,
-              "location": {
-                "uri": "file:///minimal_impl.nim",
-                "range": {
-                  "start": {"line": 2, "character": 0},
-                  "end": {"line": 2, "character": 10},
-                },
+    let testConfig = %*{
+      "currentScenario": "minimal_impl",
+      "scenarios": {
+        "minimal_impl": {
+          "name": "Minimal Implementation Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {
+            "enabled": true,
+            "location": {
+              "uri": "file:///minimal_impl.nim",
+              "range": {
+                "start": {"line": 2, "character": 0},
+                "end": {"line": 2, "character": 10},
               },
             },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-            },
-          }
-        },
-      }
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2351,63 +2315,62 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_references_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "references_test",
-        "scenarios": {
-          "references_test": {
-            "name": "References Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references": {
-              "enabled": true,
-              "includeDeclaration": true,
-              "locations": [
-                {
-                  "uri": "file:///reference1.nim",
-                  "range": {
-                    "start": {"line": 15, "character": 8},
-                    "end": {"line": 15, "character": 18},
-                  },
+    let testConfig = %*{
+      "currentScenario": "references_test",
+      "scenarios": {
+        "references_test": {
+          "name": "References Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {
+            "enabled": true,
+            "includeDeclaration": true,
+            "locations": [
+              {
+                "uri": "file:///reference1.nim",
+                "range": {
+                  "start": {"line": 15, "character": 8},
+                  "end": {"line": 15, "character": 18},
                 },
-                {
-                  "uri": "file:///reference2.nim",
-                  "range": {
-                    "start": {"line": 42, "character": 12},
-                    "end": {"line": 42, "character": 22},
-                  },
+              },
+              {
+                "uri": "file:///reference2.nim",
+                "range": {
+                  "start": {"line": 42, "character": 12},
+                  "end": {"line": 42, "character": 22},
                 },
-                {
-                  "uri": "file:///reference3.nim",
-                  "range": {
-                    "start": {"line": 78, "character": 0},
-                    "end": {"line": 78, "character": 10},
-                  },
+              },
+              {
+                "uri": "file:///reference3.nim",
+                "range": {
+                  "start": {"line": 78, "character": 0},
+                  "end": {"line": 78, "character": 10},
                 },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 75,
-            },
-          }
-        },
-      }
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 75,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2453,37 +2416,36 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_references_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_references",
-        "scenarios": {
-          "no_references": {
-            "name": "No References Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_references",
+      "scenarios": {
+        "no_references": {
+          "name": "No References Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2502,36 +2464,35 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_references_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_ref_config",
-        "scenarios": {
-          "no_ref_config": {
-            "name": "No References Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_ref_config",
+      "scenarios": {
+        "no_ref_config": {
+          "name": "No References Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2550,48 +2511,47 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_minimal_references_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "minimal_ref",
-        "scenarios": {
-          "minimal_ref": {
-            "name": "Minimal References Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references": {
-              "enabled": true,
-              "locations": [
-                {
-                  "uri": "file:///minimal_ref.nim",
-                  "range": {
-                    "start": {"line": 5, "character": 0},
-                    "end": {"line": 5, "character": 10},
-                  },
-                }
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "minimal_ref",
+      "scenarios": {
+        "minimal_ref": {
+          "name": "Minimal References Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {
+            "enabled": true,
+            "locations": [
+              {
+                "uri": "file:///minimal_ref.nim",
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 5, "character": 10},
+                },
+              }
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2615,49 +2575,48 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_references_no_decl_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "references_no_decl",
-        "scenarios": {
-          "references_no_decl": {
-            "name": "References Without Declaration Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references": {
-              "enabled": true,
-              "includeDeclaration": false,
-              "locations": [
-                {
-                  "uri": "file:///reference_only.nim",
-                  "range": {
-                    "start": {"line": 10, "character": 5},
-                    "end": {"line": 10, "character": 15},
-                  },
-                }
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "references_no_decl",
+      "scenarios": {
+        "references_no_decl": {
+          "name": "References Without Declaration Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {
+            "enabled": true,
+            "includeDeclaration": false,
+            "locations": [
+              {
+                "uri": "file:///reference_only.nim",
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+              }
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2704,65 +2663,63 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_document_highlight_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "highlight_test",
-        "scenarios": {
-          "highlight_test": {
-            "name": "Document Highlight Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references":
-              {"enabled": false, "locations": [], "includeDeclaration": true},
-            "documentHighlight": {
-              "enabled": true,
-              "highlights": [
-                {
-                  "range": {
-                    "start": {"line": 10, "character": 5},
-                    "end": {"line": 10, "character": 15},
-                  },
-                  "kind": 1,
+    let testConfig = %*{
+      "currentScenario": "highlight_test",
+      "scenarios": {
+        "highlight_test": {
+          "name": "Document Highlight Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {"enabled": false, "locations": [], "includeDeclaration": true},
+          "documentHighlight": {
+            "enabled": true,
+            "highlights": [
+              {
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
                 },
-                {
-                  "range": {
-                    "start": {"line": 20, "character": 8},
-                    "end": {"line": 20, "character": 18},
-                  },
-                  "kind": 2,
+                "kind": 1,
+              },
+              {
+                "range": {
+                  "start": {"line": 20, "character": 8},
+                  "end": {"line": 20, "character": 18},
                 },
-                {
-                  "range": {
-                    "start": {"line": 25, "character": 12},
-                    "end": {"line": 25, "character": 22},
-                  },
-                  "kind": 3,
+                "kind": 2,
+              },
+              {
+                "range": {
+                  "start": {"line": 25, "character": 12},
+                  "end": {"line": 25, "character": 22},
                 },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-              "documentHighlight": 45,
-            },
-          }
-        },
-      }
+                "kind": 3,
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+            "documentHighlight": 45,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2806,40 +2763,38 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_document_highlight_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_highlight",
-        "scenarios": {
-          "no_highlight": {
-            "name": "No Document Highlight Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references":
-              {"enabled": false, "locations": [], "includeDeclaration": true},
-            "documentHighlight": {"enabled": false},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-              "documentHighlight": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_highlight",
+      "scenarios": {
+        "no_highlight": {
+          "name": "No Document Highlight Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {"enabled": false, "locations": [], "includeDeclaration": true},
+          "documentHighlight": {"enabled": false},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+            "documentHighlight": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2857,39 +2812,37 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_document_highlight_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_highlight_config",
-        "scenarios": {
-          "no_highlight_config": {
-            "name": "No Document Highlight Config Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "semanticTokens": {"enabled": false, "tokens": []},
-            "inlayHint": {"enabled": false, "hints": []},
-            "declaration": {"enabled": false},
-            "definition": {"enabled": false},
-            "typeDefinition": {"enabled": false},
-            "implementation": {"enabled": false},
-            "references":
-              {"enabled": false, "locations": [], "includeDeclaration": true},
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "inlayHint": 0,
-              "declaration": 0,
-              "definition": 0,
-              "typeDefinition": 0,
-              "implementation": 0,
-              "references": 0,
-              "documentHighlight": 0,
-            },
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_highlight_config",
+      "scenarios": {
+        "no_highlight_config": {
+          "name": "No Document Highlight Config Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "semanticTokens": {"enabled": false, "tokens": []},
+          "inlayHint": {"enabled": false, "hints": []},
+          "declaration": {"enabled": false},
+          "definition": {"enabled": false},
+          "typeDefinition": {"enabled": false},
+          "implementation": {"enabled": false},
+          "references": {"enabled": false, "locations": [], "includeDeclaration": true},
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "inlayHint": 0,
+            "declaration": 0,
+            "definition": 0,
+            "typeDefinition": 0,
+            "implementation": 0,
+            "references": 0,
+            "documentHighlight": 0,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -2906,23 +2859,22 @@ suite "scenario module tests":
   test "DocumentHighlightConfig with optional kind":
     let highlightConfig = DocumentHighlightConfig(
       enabled: true,
-      highlights:
-        @[
-          DocumentHighlightContent(
-            range: Range(
-              start: Position(line: 5, character: 10),
-              `end`: Position(line: 5, character: 20),
-            ),
-            kind: none(int), # No kind specified
+      highlights: @[
+        DocumentHighlightContent(
+          range: Range(
+            start: Position(line: 5, character: 10),
+            `end`: Position(line: 5, character: 20),
           ),
-          DocumentHighlightContent(
-            range: Range(
-              start: Position(line: 10, character: 0),
-              `end`: Position(line: 10, character: 5),
-            ),
-            kind: some(2), # Read kind
+          kind: none(int), # No kind specified
+        ),
+        DocumentHighlightContent(
+          range: Range(
+            start: Position(line: 10, character: 0),
+            `end`: Position(line: 10, character: 5),
           ),
-        ],
+          kind: some(2), # Read kind
+        ),
+      ],
     )
 
     check highlightConfig.enabled == true
@@ -2953,44 +2905,43 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_formatting_config.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "formatting_test",
-        "scenarios": {
-          "formatting_test": {
-            "name": "Formatting Test Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "formatting": {
-              "enabled": true,
-              "edits": [
-                {
-                  "range": {
-                    "start": {"line": 1, "character": 0},
-                    "end": {"line": 1, "character": 20},
-                  },
-                  "newText": "function formattedFunction() {",
+    let testConfig = %*{
+      "currentScenario": "formatting_test",
+      "scenarios": {
+        "formatting_test": {
+          "name": "Formatting Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "formatting": {
+            "enabled": true,
+            "edits": [
+              {
+                "range": {
+                  "start": {"line": 1, "character": 0},
+                  "end": {"line": 1, "character": 20},
                 },
-                {
-                  "range": {
-                    "start": {"line": 5, "character": 2},
-                    "end": {"line": 5, "character": 10},
-                  },
-                  "newText": "    return;",
+                "newText": "function formattedFunction() {",
+              },
+              {
+                "range": {
+                  "start": {"line": 5, "character": 2},
+                  "end": {"line": 5, "character": 10},
                 },
-              ],
-            },
-            "delays": {
-              "hover": 0,
-              "completion": 0,
-              "diagnostics": 0,
-              "semanticTokens": 0,
-              "formatting": 50,
-            },
-          }
-        },
-      }
+                "newText": "    return;",
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "formatting": 50,
+          },
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -3024,20 +2975,19 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_formatting_disabled.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "formatting_disabled",
-        "scenarios": {
-          "formatting_disabled": {
-            "name": "Formatting Disabled Scenario",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-            "formatting": {"enabled": false},
-            "delays": {"formatting": 0},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "formatting_disabled",
+      "scenarios": {
+        "formatting_disabled": {
+          "name": "Formatting Disabled Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "formatting": {"enabled": false},
+          "delays": {"formatting": 0},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 
@@ -3056,18 +3006,17 @@ suite "scenario module tests":
     let tempDir = getTempDir()
     configPath = tempDir / "test_no_formatting.json"
 
-    let testConfig =
-      %*{
-        "currentScenario": "no_formatting",
-        "scenarios": {
-          "no_formatting": {
-            "name": "No Formatting Config",
-            "hover": {"enabled": false},
-            "completion": {"enabled": false, "items": []},
-            "diagnostics": {"enabled": false, "diagnostics": []},
-          }
-        },
-      }
+    let testConfig = %*{
+      "currentScenario": "no_formatting",
+      "scenarios": {
+        "no_formatting": {
+          "name": "No Formatting Config",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+        }
+      },
+    }
 
     writeFile(configPath, pretty(testConfig))
 

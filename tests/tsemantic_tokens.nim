@@ -89,18 +89,16 @@ suite "semantic tokens protocol types tests":
 
   test "SemanticTokensLegend initialization":
     let legend = SemanticTokensLegend()
-    legend.tokenTypes =
-      @[
-        "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
-        "parameter", "variable", "property", "enumMember", "event", "function",
-        "method", "macro", "keyword", "modifier", "comment", "string", "number",
-        "regexp", "operator", "decorator",
-      ]
-    legend.tokenModifiers =
-      @[
-        "declaration", "definition", "readonly", "static", "deprecated", "abstract",
-        "async", "modification", "documentation", "defaultLibrary",
-      ]
+    legend.tokenTypes = @[
+      "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+      "parameter", "variable", "property", "enumMember", "event", "function", "method",
+      "macro", "keyword", "modifier", "comment", "string", "number", "regexp",
+      "operator", "decorator",
+    ]
+    legend.tokenModifiers = @[
+      "declaration", "definition", "readonly", "static", "deprecated", "abstract",
+      "async", "modification", "documentation", "defaultLibrary",
+    ]
 
     check legend.tokenTypes.len == 23
     check legend.tokenModifiers.len == 10
@@ -159,33 +157,32 @@ suite "semantic tokens protocol types tests":
     # Test a realistic semantic tokens data array
     let tokens = SemanticTokens()
     tokens.resultId = some("complex-result")
-    tokens.data =
-      @[
-        # Token 1: "function" keyword at line 0, col 0, length 8, type=keyword, modifiers=none
-        uinteger(0),
-        uinteger(0),
-        uinteger(8),
-        uinteger(15),
-        uinteger(0),
-        # Token 2: function name at same line, col 9, length 4, type=function, modifiers=declaration
-        uinteger(0),
-        uinteger(9),
-        uinteger(4),
-        uinteger(12),
-        uinteger(1),
-        # Token 3: parameter at next line, col 2, length 5, type=parameter, modifiers=none
-        uinteger(1),
-        uinteger(2),
-        uinteger(5),
-        uinteger(7),
-        uinteger(0),
-        # Token 4: type annotation at same line, col 8, length 6, type=type, modifiers=none
-        uinteger(0),
-        uinteger(8),
-        uinteger(6),
-        uinteger(1),
-        uinteger(0),
-      ]
+    tokens.data = @[
+      # Token 1: "function" keyword at line 0, col 0, length 8, type=keyword, modifiers=none
+      uinteger(0),
+      uinteger(0),
+      uinteger(8),
+      uinteger(15),
+      uinteger(0),
+      # Token 2: function name at same line, col 9, length 4, type=function, modifiers=declaration
+      uinteger(0),
+      uinteger(9),
+      uinteger(4),
+      uinteger(12),
+      uinteger(1),
+      # Token 3: parameter at next line, col 2, length 5, type=parameter, modifiers=none
+      uinteger(1),
+      uinteger(2),
+      uinteger(5),
+      uinteger(7),
+      uinteger(0),
+      # Token 4: type annotation at same line, col 8, length 6, type=type, modifiers=none
+      uinteger(0),
+      uinteger(8),
+      uinteger(6),
+      uinteger(1),
+      uinteger(0),
+    ]
 
     check tokens.data.len == 20 # 4 tokens * 5 values each
     check tokens.resultId.get == "complex-result"
