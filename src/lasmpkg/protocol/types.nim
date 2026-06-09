@@ -667,7 +667,8 @@ type
     executeCommandProvider*: Option[ExecuteCommandOptions]
     # selectionRangeProvider?: boolean | SelectionRangeOptions | SelectionRangeRegistrationOptions;
     # linkedEditingRangeProvider?: boolean | LinkedEditingRangeOptions | LinkedEditingRangeRegistrationOptions;
-    # callHierarchyProvider?: boolean | CallHierarchyOptions | CallHierarchyRegistrationOptions;
+    callHierarchyProvider*: Option[bool]
+      # boolean | CallHierarchyOptions | CallHierarchyRegistrationOptions
     semanticTokensProvider*: Option[SemanticTokensOptions]
     # monikerProvider?: boolean | MonikerOptions | MonikerRegistrationOptions;
     # typeHierarchyProvider?: boolean | TypeHierarchyOptions | TypeHierarchyRegistrationOptions;
@@ -860,6 +861,22 @@ type
   DocumentHighlight* = ref object of RootObj
     `range`*: Range
     kind*: Option[int]
+
+  CallHierarchyItem* = ref object of RootObj
+    name*: string
+    kind*: int # SymbolKind
+    detail*: Option[string]
+    uri*: string
+    `range`*: Range
+    selectionRange*: Range
+
+  CallHierarchyIncomingCall* = ref object of RootObj
+    `from`*: CallHierarchyItem
+    fromRanges*: seq[Range]
+
+  CallHierarchyOutgoingCall* = ref object of RootObj
+    to*: CallHierarchyItem
+    fromRanges*: seq[Range]
 
   DocumentSymbolParams* = ref object of RootObj
     textDocument*: TextDocumentIdentifier

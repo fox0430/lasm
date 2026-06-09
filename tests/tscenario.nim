@@ -3031,3 +3031,132 @@ suite "scenario module tests":
     check scenario.formatting.enabled == false
     check scenario.formatting.edits.len == 0
     check scenario.delays.formatting == 0
+
+  test "loadConfigFile with call hierarchy configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_call_hierarchy.json"
+
+    let testConfig = %*{
+      "currentScenario": "ch",
+      "scenarios": {
+        "ch": {
+          "name": "Call Hierarchy Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "prepareCallHierarchy": {
+            "enabled": true,
+            "items": [
+              {
+                "name": "myFunction",
+                "kind": 12,
+                "detail": "proc myFunction()",
+                "uri": "file:///file.nim",
+                "range": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+                "selectionRange": {
+                  "start": {"line": 10, "character": 5},
+                  "end": {"line": 10, "character": 15},
+                },
+              }
+            ],
+          },
+          "callHierarchyIncoming": {
+            "enabled": true,
+            "calls": [
+              {
+                "from": {
+                  "name": "caller",
+                  "kind": 12,
+                  "uri": "file:///caller.nim",
+                  "range": {
+                    "start": {"line": 5, "character": 0},
+                    "end": {"line": 8, "character": 1},
+                  },
+                  "selectionRange": {
+                    "start": {"line": 5, "character": 5},
+                    "end": {"line": 5, "character": 11},
+                  },
+                },
+                "fromRanges": [
+                  {
+                    "start": {"line": 6, "character": 2},
+                    "end": {"line": 6, "character": 12},
+                  }
+                ],
+              }
+            ],
+          },
+          "callHierarchyOutgoing": {
+            "enabled": true,
+            "calls": [
+              {
+                "to": {
+                  "name": "callee",
+                  "kind": 12,
+                  "uri": "file:///callee.nim",
+                  "range": {
+                    "start": {"line": 20, "character": 0},
+                    "end": {"line": 23, "character": 1},
+                  },
+                  "selectionRange": {
+                    "start": {"line": 20, "character": 5},
+                    "end": {"line": 20, "character": 11},
+                  },
+                },
+                "fromRanges": [
+                  {
+                    "start": {"line": 11, "character": 2},
+                    "end": {"line": 11, "character": 8},
+                  }
+                ],
+              }
+            ],
+          },
+          "delays": {
+            "prepareCallHierarchy": 40,
+            "callHierarchyIncoming": 45,
+            "callHierarchyOutgoing": 50,
+          },
+        }
+      },
+    }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["ch"]
+
+    check scenario.prepareCallHierarchy.enabled == true
+    check scenario.prepareCallHierarchy.items.len == 1
+    let item = scenario.prepareCallHierarchy.items[0]
+    check item.name == "myFunction"
+    check item.kind == 12
+    check item.detail == some("proc myFunction()")
+    check item.uri == "file:///file.nim"
+    check item.range.start.line == 10
+    check item.selectionRange.`end`.character == 15
+
+    check scenario.callHierarchyIncoming.enabled == true
+    check scenario.callHierarchyIncoming.calls.len == 1
+    let incoming = scenario.callHierarchyIncoming.calls[0]
+    check incoming.`from`.name == "caller"
+    check incoming.fromRanges.len == 1
+    check incoming.fromRanges[0].start.line == 6
+
+    check scenario.callHierarchyOutgoing.enabled == true
+    check scenario.callHierarchyOutgoing.calls.len == 1
+    let outgoing = scenario.callHierarchyOutgoing.calls[0]
+    check outgoing.to.name == "callee"
+    check outgoing.fromRanges.len == 1
+    check outgoing.fromRanges[0].start.line == 11
+
+    check scenario.delays.prepareCallHierarchy == 40
+    check scenario.delays.callHierarchyIncoming == 45
+    check scenario.delays.callHierarchyOutgoing == 50

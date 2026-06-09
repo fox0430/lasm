@@ -113,6 +113,34 @@ type
     enabled*: bool
     highlights*: seq[DocumentHighlightContent]
 
+  CallHierarchyItemContent* = object
+    name*: string
+    kind*: int
+    detail*: Option[string]
+    uri*: string
+    range*: Range
+    selectionRange*: Range
+
+  PrepareCallHierarchyConfig* = object
+    enabled*: bool
+    items*: seq[CallHierarchyItemContent]
+
+  CallHierarchyIncomingContent* = object
+    `from`*: CallHierarchyItemContent
+    fromRanges*: seq[Range]
+
+  CallHierarchyIncomingConfig* = object
+    enabled*: bool
+    calls*: seq[CallHierarchyIncomingContent]
+
+  CallHierarchyOutgoingContent* = object
+    to*: CallHierarchyItemContent
+    fromRanges*: seq[Range]
+
+  CallHierarchyOutgoingConfig* = object
+    enabled*: bool
+    calls*: seq[CallHierarchyOutgoingContent]
+
   RenameEditChange* = object
     uri*: string
     edits*: seq[TextEdit]
@@ -151,6 +179,9 @@ type
     documentHighlight*: int
     rename*: int
     formatting*: int
+    prepareCallHierarchy*: int
+    callHierarchyIncoming*: int
+    callHierarchyOutgoing*: int
 
   ErrorConfig* = object
     code*: int
@@ -175,6 +206,9 @@ type
     documentHighlight*: DocumentHighlightConfig
     rename*: RenameConfig
     formatting*: FormattingConfig
+    prepareCallHierarchy*: PrepareCallHierarchyConfig
+    callHierarchyIncoming*: CallHierarchyIncomingConfig
+    callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -182,6 +216,39 @@ type
     scenarios*: Table[string, Scenario]
     currentScenario*: string
     configPath*: string
+
+proc parseRange(rangeNode: JsonNode): Range =
+  ## Parses a Range from a JSON node with the standard
+  ## {"start": {...}, "end": {...}} shape.
+  Range(
+    start: Position(
+      line: uinteger(rangeNode["start"]["line"].getInt(0)),
+      character: uinteger(rangeNode["start"]["character"].getInt(0)),
+    ),
+    `end`: Position(
+      line: uinteger(rangeNode["end"]["line"].getInt(0)),
+      character: uinteger(rangeNode["end"]["character"].getInt(0)),
+    ),
+  )
+
+proc parseCallHierarchyItem(itemNode: JsonNode): CallHierarchyItemContent =
+  ## Parses a CallHierarchyItem from a JSON node.
+  result = CallHierarchyItemContent(
+    name: itemNode["name"].getStr(""),
+    kind: itemNode{"kind"}.getInt(0),
+    uri: itemNode["uri"].getStr(""),
+    range: parseRange(itemNode["range"]),
+    selectionRange: parseRange(itemNode["selectionRange"]),
+  )
+  if itemNode.hasKey("detail"):
+    result.detail = some(itemNode["detail"].getStr(""))
+
+proc parseFromRanges(callNode: JsonNode): seq[Range] =
+  ## Parses the fromRanges array of a call hierarchy call.
+  result = @[]
+  if callNode.contains("fromRanges"):
+    for rangeNode in callNode["fromRanges"]:
+      result.add(parseRange(rangeNode))
 
 proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
   # If configPath is empty, don't try to load any file
@@ -330,19 +397,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
                 severity: diagNode{"severity"}.getInt(1), # Default to Error
               )
 
-              # Parse range
               if diagNode.contains("range"):
-                let rangeNode = diagNode["range"]
-                diag.range = Range(
-                  start: Position(
-                    line: rangeNode["start"]["line"].getInt(0),
-                    character: rangeNode["start"]["character"].getInt(0),
-                  ),
-                  `end`: Position(
-                    line: rangeNode["end"]["line"].getInt(0),
-                    character: rangeNode["end"]["character"].getInt(0),
-                  ),
-                )
+                diag.range = parseRange(diagNode["range"])
               else:
                 # Default to first character
                 diag.range = Range(
@@ -859,6 +915,61 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default formatting config if not specified
           scenario.formatting = FormattingConfig(enabled: false, edits: @[])
 
+        if scenarioData.hasKey("prepareCallHierarchy"):
+          # Load prepare call hierarchy configuration
+          let prepareNode = scenarioData["prepareCallHierarchy"]
+          var pc =
+            PrepareCallHierarchyConfig(enabled: prepareNode["enabled"].getBool(false))
+          if pc.enabled and prepareNode.contains("items"):
+            pc.items = @[]
+            for itemNode in prepareNode["items"]:
+              pc.items.add(parseCallHierarchyItem(itemNode))
+          scenario.prepareCallHierarchy = pc
+        else:
+          # Default prepare call hierarchy config if not specified
+          scenario.prepareCallHierarchy =
+            PrepareCallHierarchyConfig(enabled: false, items: @[])
+
+        if scenarioData.hasKey("callHierarchyIncoming"):
+          # Load incoming calls configuration
+          let incomingNode = scenarioData["callHierarchyIncoming"]
+          var ic =
+            CallHierarchyIncomingConfig(enabled: incomingNode["enabled"].getBool(false))
+          if ic.enabled and incomingNode.contains("calls"):
+            ic.calls = @[]
+            for callNode in incomingNode["calls"]:
+              ic.calls.add(
+                CallHierarchyIncomingContent(
+                  `from`: parseCallHierarchyItem(callNode["from"]),
+                  fromRanges: parseFromRanges(callNode),
+                )
+              )
+          scenario.callHierarchyIncoming = ic
+        else:
+          # Default incoming calls config if not specified
+          scenario.callHierarchyIncoming =
+            CallHierarchyIncomingConfig(enabled: false, calls: @[])
+
+        if scenarioData.hasKey("callHierarchyOutgoing"):
+          # Load outgoing calls configuration
+          let outgoingNode = scenarioData["callHierarchyOutgoing"]
+          var oc =
+            CallHierarchyOutgoingConfig(enabled: outgoingNode["enabled"].getBool(false))
+          if oc.enabled and outgoingNode.contains("calls"):
+            oc.calls = @[]
+            for callNode in outgoingNode["calls"]:
+              oc.calls.add(
+                CallHierarchyOutgoingContent(
+                  to: parseCallHierarchyItem(callNode["to"]),
+                  fromRanges: parseFromRanges(callNode),
+                )
+              )
+          scenario.callHierarchyOutgoing = oc
+        else:
+          # Default outgoing calls config if not specified
+          scenario.callHierarchyOutgoing =
+            CallHierarchyOutgoingConfig(enabled: false, calls: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -876,6 +987,9 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
             rename: delaysNode{"rename"}.getInt(0),
             formatting: delaysNode{"formatting"}.getInt(0),
+            prepareCallHierarchy: delaysNode{"prepareCallHierarchy"}.getInt(0),
+            callHierarchyIncoming: delaysNode{"callHierarchyIncoming"}.getInt(0),
+            callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -893,6 +1007,9 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentHighlight: 0,
             rename: 0,
             formatting: 0,
+            prepareCallHierarchy: 0,
+            callHierarchyIncoming: 0,
+            callHierarchyOutgoing: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -936,6 +1053,9 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     documentHighlight: DocumentHighlightConfig(enabled: false),
     rename: RenameConfig(enabled: false),
     formatting: FormattingConfig(enabled: false),
+    prepareCallHierarchy: PrepareCallHierarchyConfig(enabled: false),
+    callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: false),
+    callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
   )
@@ -1075,6 +1195,9 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "documentHighlight": 45,
           "rename": 60,
           "formatting": 40,
+          "prepareCallHierarchy": 40,
+          "callHierarchyIncoming": 45,
+          "callHierarchyOutgoing": 45,
         },
         "semanticTokens": {
           "enabled": true,
@@ -1163,6 +1286,79 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "kind": 3,
             },
+          ],
+        },
+        "prepareCallHierarchy": {
+          "enabled": true,
+          "items": [
+            {
+              "name": "myFunction",
+              "kind": 12,
+              "detail": "proc myFunction()",
+              "uri": "file:///path/to/file.nim",
+              "range": {
+                "start": {"line": 10, "character": 5},
+                "end": {"line": 10, "character": 15},
+              },
+              "selectionRange": {
+                "start": {"line": 10, "character": 5},
+                "end": {"line": 10, "character": 15},
+              },
+            }
+          ],
+        },
+        "callHierarchyIncoming": {
+          "enabled": true,
+          "calls": [
+            {
+              "from": {
+                "name": "callerFunction",
+                "kind": 12,
+                "detail": "proc callerFunction()",
+                "uri": "file:///path/to/caller.nim",
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 8, "character": 1},
+                },
+                "selectionRange": {
+                  "start": {"line": 5, "character": 5},
+                  "end": {"line": 5, "character": 19},
+                },
+              },
+              "fromRanges": [
+                {
+                  "start": {"line": 6, "character": 2},
+                  "end": {"line": 6, "character": 12},
+                }
+              ],
+            }
+          ],
+        },
+        "callHierarchyOutgoing": {
+          "enabled": true,
+          "calls": [
+            {
+              "to": {
+                "name": "calleeFunction",
+                "kind": 12,
+                "detail": "proc calleeFunction()",
+                "uri": "file:///path/to/callee.nim",
+                "range": {
+                  "start": {"line": 20, "character": 0},
+                  "end": {"line": 23, "character": 1},
+                },
+                "selectionRange": {
+                  "start": {"line": 20, "character": 5},
+                  "end": {"line": 20, "character": 19},
+                },
+              },
+              "fromRanges": [
+                {
+                  "start": {"line": 11, "character": 2},
+                  "end": {"line": 11, "character": 16},
+                }
+              ],
+            }
           ],
         },
         "rename": {

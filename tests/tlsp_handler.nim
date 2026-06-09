@@ -314,6 +314,79 @@ proc createTestScenarioManager(): ScenarioManager =
         ),
       ],
     ),
+    prepareCallHierarchy: PrepareCallHierarchyConfig(
+      enabled: true,
+      items: @[
+        CallHierarchyItemContent(
+          name: "testFunc",
+          kind: 12, # Function
+          detail: some("proc testFunc()"),
+          uri: "file:///test_call_hierarchy.nim",
+          range: Range(
+            start: Position(line: 10, character: 5),
+            `end`: Position(line: 10, character: 13),
+          ),
+          selectionRange: Range(
+            start: Position(line: 10, character: 5),
+            `end`: Position(line: 10, character: 13),
+          ),
+        )
+      ],
+    ),
+    callHierarchyIncoming: CallHierarchyIncomingConfig(
+      enabled: true,
+      calls: @[
+        CallHierarchyIncomingContent(
+          `from`: CallHierarchyItemContent(
+            name: "callerFunc",
+            kind: 12,
+            detail: some("proc callerFunc()"),
+            uri: "file:///test_caller.nim",
+            range: Range(
+              start: Position(line: 5, character: 0),
+              `end`: Position(line: 8, character: 1),
+            ),
+            selectionRange: Range(
+              start: Position(line: 5, character: 5),
+              `end`: Position(line: 5, character: 15),
+            ),
+          ),
+          fromRanges: @[
+            Range(
+              start: Position(line: 6, character: 2),
+              `end`: Position(line: 6, character: 10),
+            )
+          ],
+        )
+      ],
+    ),
+    callHierarchyOutgoing: CallHierarchyOutgoingConfig(
+      enabled: true,
+      calls: @[
+        CallHierarchyOutgoingContent(
+          to: CallHierarchyItemContent(
+            name: "calleeFunc",
+            kind: 12,
+            detail: some("proc calleeFunc()"),
+            uri: "file:///test_callee.nim",
+            range: Range(
+              start: Position(line: 20, character: 0),
+              `end`: Position(line: 23, character: 1),
+            ),
+            selectionRange: Range(
+              start: Position(line: 20, character: 5),
+              `end`: Position(line: 20, character: 15),
+            ),
+          ),
+          fromRanges: @[
+            Range(
+              start: Position(line: 11, character: 2),
+              `end`: Position(line: 11, character: 12),
+            )
+          ],
+        )
+      ],
+    ),
     errors: initTable[string, ErrorConfig](),
   )
 
@@ -382,6 +455,9 @@ proc createTestScenarioManager(): ScenarioManager =
     ),
     references: ReferenceConfig(enabled: true, locations: @[], includeDeclaration: true),
     documentHighlight: DocumentHighlightConfig(enabled: true, highlights: @[]),
+    prepareCallHierarchy: PrepareCallHierarchyConfig(enabled: true, items: @[]),
+    callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: true, calls: @[]),
+    callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: true, calls: @[]),
     errors: {
       "hover": ErrorConfig(code: -32603, message: "Test error"),
       "completion": ErrorConfig(code: -32602, message: "Completion error"),
@@ -395,6 +471,12 @@ proc createTestScenarioManager(): ScenarioManager =
       "references": ErrorConfig(code: -32603, message: "References error"),
       "documentHighlight":
         ErrorConfig(code: -32603, message: "Document highlight error"),
+      "prepareCallHierarchy":
+        ErrorConfig(code: -32603, message: "Prepare call hierarchy error"),
+      "callHierarchyIncoming":
+        ErrorConfig(code: -32603, message: "Incoming calls error"),
+      "callHierarchyOutgoing":
+        ErrorConfig(code: -32603, message: "Outgoing calls error"),
     }.toTable,
   )
 
@@ -2608,6 +2690,198 @@ suite "lsp_handler module tests":
 
     check response.kind == JArray
     check response.len == 1
+
+  test "handlePrepareCallHierarchy with enabled items":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test" # Has call hierarchy configured
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 10, "character": 6},
+    }
+
+    let response = waitFor handler.handlePrepareCallHierarchy(%1, params)
+
+    check response.kind == JArray
+    check response.len == 1
+
+    let item = response[0]
+    check item["name"].getStr() == "testFunc"
+    check item["kind"].getInt() == 12
+    check item["detail"].getStr() == "proc testFunc()"
+    check item["uri"].getStr() == "file:///test_call_hierarchy.nim"
+    check item["range"]["start"]["line"].getInt() == 10
+    check item["range"]["start"]["character"].getInt() == 5
+    check item["range"]["end"]["line"].getInt() == 10
+    check item["range"]["end"]["character"].getInt() == 13
+    check item["selectionRange"]["start"]["line"].getInt() == 10
+    check item["selectionRange"]["end"]["character"].getInt() == 13
+
+  test "handlePrepareCallHierarchy with disabled config":
+    let sm = createTestScenarioManager()
+    # default scenario has call hierarchy disabled
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handlePrepareCallHierarchy(%1, params)
+
+    check response.kind == JNull
+
+  test "handlePrepareCallHierarchy with non-existent document":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///nonexistent.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handlePrepareCallHierarchy(%1, params)
+
+    check response.kind == JNull
+
+  test "handlePrepareCallHierarchy with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "func test() {}", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    expect LSPError:
+      discard waitFor handler.handlePrepareCallHierarchy(%1, params)
+
+  test "handleIncomingCalls with enabled calls":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{
+      "item": {
+        "name": "testFunc",
+        "kind": 12,
+        "uri": "file:///test_call_hierarchy.nim",
+        "range":
+          {"start": {"line": 10, "character": 5}, "end": {"line": 10, "character": 13}},
+        "selectionRange":
+          {"start": {"line": 10, "character": 5}, "end": {"line": 10, "character": 13}},
+      }
+    }
+
+    let response = waitFor handler.handleIncomingCalls(%1, params)
+
+    check response.kind == JArray
+    check response.len == 1
+
+    let call = response[0]
+    check call["from"]["name"].getStr() == "callerFunc"
+    check call["from"]["kind"].getInt() == 12
+    check call["from"]["uri"].getStr() == "file:///test_caller.nim"
+    check call["fromRanges"].kind == JArray
+    check call["fromRanges"].len == 1
+    check call["fromRanges"][0]["start"]["line"].getInt() == 6
+    check call["fromRanges"][0]["start"]["character"].getInt() == 2
+    check call["fromRanges"][0]["end"]["character"].getInt() == 10
+
+  test "handleIncomingCalls with disabled config":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"item": {"name": "testFunc"}}
+
+    let response = waitFor handler.handleIncomingCalls(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleIncomingCalls with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"item": {"name": "testFunc"}}
+
+    expect LSPError:
+      discard waitFor handler.handleIncomingCalls(%1, params)
+
+  test "handleOutgoingCalls with enabled calls":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "test"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{
+      "item": {
+        "name": "testFunc",
+        "kind": 12,
+        "uri": "file:///test_call_hierarchy.nim",
+        "range":
+          {"start": {"line": 10, "character": 5}, "end": {"line": 10, "character": 13}},
+        "selectionRange":
+          {"start": {"line": 10, "character": 5}, "end": {"line": 10, "character": 13}},
+      }
+    }
+
+    let response = waitFor handler.handleOutgoingCalls(%1, params)
+
+    check response.kind == JArray
+    check response.len == 1
+
+    let call = response[0]
+    check call["to"]["name"].getStr() == "calleeFunc"
+    check call["to"]["kind"].getInt() == 12
+    check call["to"]["uri"].getStr() == "file:///test_callee.nim"
+    check call["fromRanges"].kind == JArray
+    check call["fromRanges"].len == 1
+    check call["fromRanges"][0]["start"]["line"].getInt() == 11
+    check call["fromRanges"][0]["start"]["character"].getInt() == 2
+    check call["fromRanges"][0]["end"]["character"].getInt() == 12
+
+  test "handleOutgoingCalls with disabled config":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"item": {"name": "testFunc"}}
+
+    let response = waitFor handler.handleOutgoingCalls(%1, params)
+
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleOutgoingCalls with error scenario":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "error"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"item": {"name": "testFunc"}}
+
+    expect LSPError:
+      discard waitFor handler.handleOutgoingCalls(%1, params)
+
+  test "handleInitialize advertises callHierarchyProvider":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"processId": 1234, "capabilities": {}}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response["capabilities"]["callHierarchyProvider"].getBool() == true
 
   test "handleDocumentFormatting with disabled formatting":
     let scenarioManager = createTestScenarioManager()
