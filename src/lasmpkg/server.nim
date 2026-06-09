@@ -415,6 +415,29 @@ proc handleDocumentFormatting(
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handlePrepareCallHierarchy(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handlePrepareCallHierarchy(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
+proc handleIncomingCalls(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleIncomingCalls(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
+proc handleOutgoingCalls(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleOutgoingCalls(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -484,6 +507,12 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleTextDocumentRename(id, params)
   of "textDocument/formatting":
     await server.handleDocumentFormatting(id, params)
+  of "textDocument/prepareCallHierarchy":
+    await server.handlePrepareCallHierarchy(id, params)
+  of "callHierarchy/incomingCalls":
+    await server.handleIncomingCalls(id, params)
+  of "callHierarchy/outgoingCalls":
+    await server.handleOutgoingCalls(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

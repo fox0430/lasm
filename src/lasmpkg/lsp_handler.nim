@@ -103,6 +103,9 @@ proc handleInitialize*(
   # Set document formatting provider
   serverCapabilities.documentFormattingProvider = some(true)
 
+  # Set call hierarchy provider
+  serverCapabilities.callHierarchyProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1141,6 +1144,104 @@ proc handleDocumentHighlight*(
   else:
     # Document not found, return empty array
     return %(@[])
+
+proc toCallHierarchyItem(c: CallHierarchyItemContent): CallHierarchyItem =
+  result = CallHierarchyItem(
+    name: c.name,
+    kind: c.kind,
+    detail: c.detail,
+    uri: c.uri,
+    range: c.range,
+    selectionRange: c.selectionRange,
+  )
+
+proc handlePrepareCallHierarchy*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.prepareCallHierarchy > 0:
+    await sleepAsync(scenario.delays.prepareCallHierarchy.milliseconds)
+
+  # Check if prepare call hierarchy is enabled
+  if not scenario.prepareCallHierarchy.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "prepareCallHierarchy" in scenario.errors:
+    let error = scenario.errors["prepareCallHierarchy"]
+    raise newException(LSPError, error.message)
+
+  # Extract position information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create call hierarchy items from scenario configuration
+    var items: seq[JsonNode] = @[]
+    for itemContent in scenario.prepareCallHierarchy.items:
+      items.add(%toCallHierarchyItem(itemContent))
+    return %items
+  else:
+    # Document not found
+    return newJNull()
+
+proc handleIncomingCalls*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.callHierarchyIncoming > 0:
+    await sleepAsync(scenario.delays.callHierarchyIncoming.milliseconds)
+
+  # Check if incoming calls is enabled
+  if not scenario.callHierarchyIncoming.enabled:
+    return %(@[])
+
+  # Check for error injection
+  if "callHierarchyIncoming" in scenario.errors:
+    let error = scenario.errors["callHierarchyIncoming"]
+    raise newException(LSPError, error.message)
+
+  # Create incoming calls from scenario configuration
+  var calls: seq[JsonNode] = @[]
+  for callContent in scenario.callHierarchyIncoming.calls:
+    let incoming = CallHierarchyIncomingCall(
+      `from`: toCallHierarchyItem(callContent.`from`),
+      fromRanges: callContent.fromRanges,
+    )
+    calls.add(%incoming)
+  return %calls
+
+proc handleOutgoingCalls*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.callHierarchyOutgoing > 0:
+    await sleepAsync(scenario.delays.callHierarchyOutgoing.milliseconds)
+
+  # Check if outgoing calls is enabled
+  if not scenario.callHierarchyOutgoing.enabled:
+    return %(@[])
+
+  # Check for error injection
+  if "callHierarchyOutgoing" in scenario.errors:
+    let error = scenario.errors["callHierarchyOutgoing"]
+    raise newException(LSPError, error.message)
+
+  # Create outgoing calls from scenario configuration
+  var calls: seq[JsonNode] = @[]
+  for callContent in scenario.callHierarchyOutgoing.calls:
+    let outgoing = CallHierarchyOutgoingCall(
+      to: toCallHierarchyItem(callContent.to), fromRanges: callContent.fromRanges
+    )
+    calls.add(%outgoing)
+  return %calls
 
 proc handleTextDocumentRename*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
