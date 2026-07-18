@@ -109,6 +109,9 @@ proc handleInitialize*(
   # Set call hierarchy provider
   serverCapabilities.callHierarchyProvider = some(true)
 
+  # Set document symbol provider
+  serverCapabilities.documentSymbolProvider = some(true)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1433,3 +1436,54 @@ proc handleDocumentRangeFormatting*(
   else:
     # Document not found, return empty edits
     return %(@[])
+
+proc toDocumentSymbolJson(c: DocumentSymbolContent): JsonNode =
+  result = newJObject()
+  result["name"] = %c.name
+  result["kind"] = %c.kind
+  result["range"] = %c.range
+  result["selectionRange"] = %c.selectionRange
+  if c.detail.isSome:
+    result["detail"] = %c.detail.get
+  if c.deprecated.isSome:
+    result["deprecated"] = %c.deprecated.get
+  if c.tags.len > 0:
+    result["tags"] = %c.tags
+  if c.children.len > 0:
+    var childrenJson = newJArray()
+    for child in c.children:
+      childrenJson.add(toDocumentSymbolJson(child))
+    result["children"] = childrenJson
+
+proc handleDocumentSymbol*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.documentSymbol > 0:
+    await sleepAsync(scenario.delays.documentSymbol.milliseconds)
+
+  # Check if document symbol is enabled
+  if not scenario.documentSymbol.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "documentSymbol" in scenario.errors:
+    let error = scenario.errors["documentSymbol"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create document symbols response from scenario configuration
+    var symbols: seq[JsonNode] = @[]
+    for symbolContent in scenario.documentSymbol.symbols:
+      symbols.add(toDocumentSymbolJson(symbolContent))
+    return %symbols
+  else:
+    # Document not found
+    return newJNull()

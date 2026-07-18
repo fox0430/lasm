@@ -447,6 +447,13 @@ proc handleOutgoingCalls(server: LSPServer, id: JsonNode, params: JsonNode) {.as
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleDocumentSymbol(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleDocumentSymbol(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -524,6 +531,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleIncomingCalls(id, params)
   of "callHierarchy/outgoingCalls":
     await server.handleOutgoingCalls(id, params)
+  of "textDocument/documentSymbol":
+    await server.handleDocumentSymbol(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":
