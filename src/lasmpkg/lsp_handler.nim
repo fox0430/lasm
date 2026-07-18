@@ -112,6 +112,10 @@ proc handleInitialize*(
   # Set document symbol provider
   serverCapabilities.documentSymbolProvider = some(true)
 
+  # Set document link provider
+  let documentLinkOptions = DocumentLinkOptions(resolveProvider: some(false))
+  serverCapabilities.documentLinkProvider = some(documentLinkOptions)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1484,6 +1488,47 @@ proc handleDocumentSymbol*(
     for symbolContent in scenario.documentSymbol.symbols:
       symbols.add(toDocumentSymbolJson(symbolContent))
     return %symbols
+  else:
+    # Document not found
+    return newJNull()
+
+proc toDocumentLinkJson(c: DocumentLinkContent): JsonNode =
+  result = newJObject()
+  result["range"] = %c.range
+  if c.target.isSome:
+    result["target"] = %c.target.get
+  if c.tooltip.isSome:
+    result["tooltip"] = %c.tooltip.get
+
+proc handleDocumentLink*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.documentLink > 0:
+    await sleepAsync(scenario.delays.documentLink.milliseconds)
+
+  # Check if document link is enabled
+  if not scenario.documentLink.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "documentLink" in scenario.errors:
+    let error = scenario.errors["documentLink"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create document links response from scenario configuration
+    var links: seq[JsonNode] = @[]
+    for linkContent in scenario.documentLink.links:
+      links.add(toDocumentLinkJson(linkContent))
+    return %links
   else:
     # Document not found
     return newJNull()

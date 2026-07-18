@@ -64,6 +64,7 @@ See `lsp-test-config-sample.json` for examples.
 | callHierarchy/incomingCalls | |
 | callHierarchy/outgoingCalls | |
 | textDocument/documentSymbol | |
+| textDocument/documentLink | |
 | textDocument/shutdown | |
 
 ## Commands
