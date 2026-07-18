@@ -415,6 +415,15 @@ proc handleDocumentFormatting(
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleDocumentRangeFormatting(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleDocumentRangeFormatting(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handlePrepareCallHierarchy(
     server: LSPServer, id: JsonNode, params: JsonNode
 ) {.async.} =
@@ -507,6 +516,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleTextDocumentRename(id, params)
   of "textDocument/formatting":
     await server.handleDocumentFormatting(id, params)
+  of "textDocument/rangeFormatting":
+    await server.handleDocumentRangeFormatting(id, params)
   of "textDocument/prepareCallHierarchy":
     await server.handlePrepareCallHierarchy(id, params)
   of "callHierarchy/incomingCalls":

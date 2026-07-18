@@ -3032,6 +3032,152 @@ suite "scenario module tests":
     check scenario.formatting.edits.len == 0
     check scenario.delays.formatting == 0
 
+  test "RangeFormattingConfig initialization":
+    let rangeFormattingConfig = RangeFormattingConfig(enabled: true, edits: @[])
+    check rangeFormattingConfig.enabled == true
+    check rangeFormattingConfig.edits.len == 0
+
+  test "RangeFormattingContent creation":
+    let rangeFormattingContent = RangeFormattingContent(
+      range: Range(
+        start: Position(line: 1, character: 0), `end`: Position(line: 1, character: 10)
+      ),
+      newText: "formatted range",
+    )
+    check rangeFormattingContent.newText == "formatted range"
+    check rangeFormattingContent.range.start.line == 1
+    check rangeFormattingContent.range.start.character == 0
+    check rangeFormattingContent.range.`end`.line == 1
+    check rangeFormattingContent.range.`end`.character == 10
+
+  test "loadConfigFile with rangeFormatting configuration":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_range_formatting_config.json"
+
+    let testConfig = %*{
+      "currentScenario": "range_formatting_test",
+      "scenarios": {
+        "range_formatting_test": {
+          "name": "Range Formatting Test Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "rangeFormatting": {
+            "enabled": true,
+            "edits": [
+              {
+                "range": {
+                  "start": {"line": 2, "character": 0},
+                  "end": {"line": 2, "character": 15},
+                },
+                "newText": "    formattedLine",
+              },
+              {
+                "range": {
+                  "start": {"line": 4, "character": 4},
+                  "end": {"line": 4, "character": 10},
+                },
+                "newText": "return;",
+              },
+            ],
+          },
+          "delays": {
+            "hover": 0,
+            "completion": 0,
+            "diagnostics": 0,
+            "semanticTokens": 0,
+            "rangeFormatting": 75,
+          },
+        }
+      },
+    }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+    check sm.currentScenario == "range_formatting_test"
+
+    let scenario = sm.scenarios["range_formatting_test"]
+    check scenario.rangeFormatting.enabled == true
+    check scenario.rangeFormatting.edits.len == 2
+    check scenario.delays.rangeFormatting == 75
+
+    let firstEdit = scenario.rangeFormatting.edits[0]
+    check firstEdit.newText == "    formattedLine"
+    check firstEdit.range.start.line == 2
+    check firstEdit.range.start.character == 0
+    check firstEdit.range.`end`.line == 2
+    check firstEdit.range.`end`.character == 15
+
+    let secondEdit = scenario.rangeFormatting.edits[1]
+    check secondEdit.newText == "return;"
+    check secondEdit.range.start.line == 4
+    check secondEdit.range.start.character == 4
+
+  test "loadConfigFile with rangeFormatting disabled":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_range_formatting_disabled.json"
+
+    let testConfig = %*{
+      "currentScenario": "range_formatting_disabled",
+      "scenarios": {
+        "range_formatting_disabled": {
+          "name": "Range Formatting Disabled Scenario",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+          "rangeFormatting": {"enabled": false},
+          "delays": {"rangeFormatting": 0},
+        }
+      },
+    }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["range_formatting_disabled"]
+    check scenario.rangeFormatting.enabled == false
+    check scenario.rangeFormatting.edits.len == 0
+    check scenario.delays.rangeFormatting == 0
+
+  test "loadConfigFile without rangeFormatting section uses defaults":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_no_range_formatting.json"
+
+    let testConfig = %*{
+      "currentScenario": "no_range_formatting",
+      "scenarios": {
+        "no_range_formatting": {
+          "name": "No Range Formatting Config",
+          "hover": {"enabled": false},
+          "completion": {"enabled": false, "items": []},
+          "diagnostics": {"enabled": false, "diagnostics": []},
+        }
+      },
+    }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["no_range_formatting"]
+    check scenario.rangeFormatting.enabled == false
+    check scenario.rangeFormatting.edits.len == 0
+    check scenario.delays.rangeFormatting == 0
+
   test "loadConfigFile with call hierarchy configuration":
     let tempDir = getTempDir()
     configPath = tempDir / "test_call_hierarchy.json"
