@@ -1,4 +1,4 @@
-import std/[sequtils, strutils, strformat, json, options, tables]
+import std/[sequtils, strutils, strformat, json, options, tables, unicode]
 
 import pkg/chronos
 
@@ -332,6 +332,50 @@ proc handleDidOpen*(
 
   return notifications
 
+proc byteOffsetOfPosition(content: string, line, character: int): int =
+  ## Convert an LSP Position (0-based line, 0-based UTF-16 code unit
+  ## `character`) into a byte offset in `content`. Positions past
+  ## end-of-line clamp to the end of that line; positions past
+  ## end-of-document clamp to end-of-document. Lines are split on `\n`;
+  ## any trailing `\r` is treated as part of the line.
+  var
+    currentLine = 0
+    lineStart = 0
+    i = 0
+  while i < content.len and currentLine < line:
+    if content[i] == '\n':
+      inc currentLine
+      lineStart = i + 1
+    inc i
+  if currentLine < line:
+    return content.len
+  var lineEnd = lineStart
+  while lineEnd < content.len and content[lineEnd] != '\n':
+    inc lineEnd
+  var
+    codeUnits = 0
+    j = lineStart
+  while j < lineEnd and codeUnits < character:
+    let r = content.runeAt(j)
+    let byteLen = content.runeLenAt(j)
+    codeUnits += (if r.int32 >= 0x10000: 2 else: 1)
+    j += byteLen
+  return j
+
+proc applyContentChange*(
+    content: string, change: TextDocumentContentChangeEvent
+): string =
+  ## Apply a single LSP `TextDocumentContentChangeEvent` to `content`.
+  ## When `change.range` is absent the change is a full sync and
+  ## `change.text` replaces the whole document; otherwise the range is
+  ## spliced with `change.text`.
+  if change.range.isNone:
+    return change.text
+  let r = change.range.get
+  let startByte = byteOffsetOfPosition(content, r.start.line.int, r.start.character.int)
+  let endByte = byteOffsetOfPosition(content, r.`end`.line.int, r.`end`.character.int)
+  return content[0 ..< startByte] & change.text & content[endByte .. ^1]
+
 proc handleDidChange*(
     handler: LSPHandler, params: JsonNode
 ): Future[seq[JsonNode]] {.async.} =
@@ -379,11 +423,9 @@ proc handleDidChange*(
   let version = textDocJson["version"].getInt()
 
   if versionedTextDoc.uri in handler.documents:
-    # Apply all content changes
     for change in contentChanges:
-      # For now, we just replace the entire content (simplified)
-      handler.documents[versionedTextDoc.uri].content = change.text
-
+      handler.documents[versionedTextDoc.uri].content =
+        applyContentChange(handler.documents[versionedTextDoc.uri].content, change)
     handler.documents[versionedTextDoc.uri].version = version
 
     let fileName = versionedTextDoc.uri.split("/")[^1]

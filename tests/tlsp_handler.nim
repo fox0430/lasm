@@ -670,7 +670,6 @@ suite "lsp_handler module tests":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)
 
-    # First add a document
     handler.documents["file:///test.nim"] = Document(content: "old content", version: 1)
 
     let params = %*{
@@ -679,7 +678,7 @@ suite "lsp_handler module tests":
         {
           "range":
             {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 3}},
-          "text": "updated content",
+          "text": "new",
         }
       ],
     }
@@ -688,8 +687,146 @@ suite "lsp_handler module tests":
 
     check handler.documents.len == 1
     let doc = handler.documents["file:///test.nim"]
-    check doc.content == "updated content"
+    check doc.content == "new content"
     check doc.version == 2
+
+  test "handleDidChange incremental: single-line replace mid-string":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///t.nim"] = Document(content: "hello world", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 6}, "end": {"line": 0, "character": 11}},
+          "text": "there",
+        }
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "hello there"
+
+  test "handleDidChange incremental: empty range insertion":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///t.nim"] = Document(content: "abcxyz", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 3}, "end": {"line": 0, "character": 3}},
+          "text": "---",
+        }
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "abc---xyz"
+
+  test "handleDidChange incremental: multi-line replace":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///t.nim"] =
+      Document(content: "line0\nline1\nline2\n", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 2}, "end": {"line": 2, "character": 3}},
+          "text": "XX\nYY",
+        }
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "liXX\nYYe2\n"
+
+  test "handleDidChange incremental: utf-16 surrogate pair (emoji)":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # "a\u{1F600}b" — the emoji is 2 UTF-16 code units, 4 UTF-8 bytes.
+    # Deleting characters 1..3 (the emoji) should leave "ab".
+    handler.documents["file:///t.nim"] =
+      Document(content: "a\xF0\x9F\x98\x80b", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 1}, "end": {"line": 0, "character": 3}},
+          "text": "",
+        }
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "ab"
+
+  test "handleDidChange incremental: multibyte utf-8 (japanese)":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    # あいう are BMP → 1 UTF-16 code unit each, 3 UTF-8 bytes each.
+    handler.documents["file:///t.nim"] = Document(content: "あいう", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 1}, "end": {"line": 0, "character": 2}},
+          "text": "え",
+        }
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "あえう"
+
+  test "handleDidChange incremental: multiple sequential changes":
+    let sm = createTestScenarioManager()
+    let handler = newLSPHandler(sm)
+
+    handler.documents["file:///t.nim"] = Document(content: "abc", version: 1)
+
+    # Two changes applied in order: insert "X" at 0, then "Y" at 2.
+    # After change 1: "Xabc"; after change 2 (character 2 of "Xabc"): "XaYbc".
+    let params = %*{
+      "textDocument": {"uri": "file:///t.nim", "version": 2},
+      "contentChanges": [
+        {
+          "range":
+            {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
+          "text": "X",
+        },
+        {
+          "range":
+            {"start": {"line": 0, "character": 2}, "end": {"line": 0, "character": 2}},
+          "text": "Y",
+        },
+      ],
+    }
+
+    discard waitFor handler.handleDidChange(params)
+
+    check handler.documents["file:///t.nim"].content == "XaYbc"
 
   test "handleDidChange for non-existent document":
     let sm = createTestScenarioManager()
