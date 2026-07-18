@@ -3787,3 +3787,171 @@ suite "lsp_handler module tests":
     # Verify notifications
     check notifications.len >= 2
     check notifications[1]["params"]["message"].getStr().contains("test2.nim")
+
+  test "handleDocumentSymbol with disabled document symbol":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # documentSymbol disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleDocumentSymbol(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentSymbol with enabled document symbol":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentSymbol = DocumentSymbolConfig(
+      enabled: true,
+      symbols: @[
+        DocumentSymbolContent(
+          name: "MyClass",
+          detail: some("class MyClass"),
+          kind: 5, # Class
+          tags: @[],
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 20, character: 1),
+          ),
+          selectionRange: Range(
+            start: Position(line: 0, character: 6),
+            `end`: Position(line: 0, character: 13),
+          ),
+          children: @[
+            DocumentSymbolContent(
+              name: "myMethod",
+              detail: some("proc myMethod()"),
+              kind: 6, # Method
+              tags: @[],
+              range: Range(
+                start: Position(line: 5, character: 2),
+                `end`: Position(line: 10, character: 3),
+              ),
+              selectionRange: Range(
+                start: Position(line: 5, character: 7),
+                `end`: Position(line: 5, character: 15),
+              ),
+              children: @[],
+            )
+          ],
+        )
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleDocumentSymbol(%1, params)
+    check response.kind == JArray
+    check response.len == 1
+
+    let firstSymbol = response[0]
+    check firstSymbol["name"].getStr() == "MyClass"
+    check firstSymbol["kind"].getInt() == 5
+    check firstSymbol["detail"].getStr() == "class MyClass"
+    check firstSymbol["range"]["start"]["line"].getInt() == 0
+    check firstSymbol["range"]["end"]["line"].getInt() == 20
+    check firstSymbol["selectionRange"]["start"]["character"].getInt() == 6
+    check firstSymbol.hasKey("children")
+    check firstSymbol["children"].len == 1
+
+    let child = firstSymbol["children"][0]
+    check child["name"].getStr() == "myMethod"
+    check child["kind"].getInt() == 6
+    check child["detail"].getStr() == "proc myMethod()"
+
+  test "handleDocumentSymbol with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentSymbol =
+      DocumentSymbolConfig(enabled: true, symbols: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"textDocument": {"uri": "file:///unknown.nim"}}
+
+    let response = waitFor handler.handleDocumentSymbol(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentSymbol with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentSymbol = DocumentSymbolConfig(
+      enabled: true,
+      symbols: @[
+        DocumentSymbolContent(
+          name: "MySymbol",
+          kind: 13, # Variable
+          tags: @[],
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 8),
+          ),
+          selectionRange: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 8),
+          ),
+          children: @[],
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.documentSymbol = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentSymbol(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleDocumentSymbol with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentSymbol =
+      DocumentSymbolConfig(enabled: true, symbols: @[])
+    scenarioManager.scenarios["default"].errors["documentSymbol"] =
+      ErrorConfig(code: -32603, message: "Document symbol failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    expect(LSPError):
+      discard waitFor handler.handleDocumentSymbol(%1, params)
+
+  test "document symbol capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentSymbolProvider")
+    check response["capabilities"]["documentSymbolProvider"].getBool() == true

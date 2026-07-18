@@ -173,6 +173,20 @@ type
     enabled*: bool
     edits*: seq[RangeFormattingContent]
 
+  DocumentSymbolContent* = ref object
+    name*: string
+    detail*: Option[string]
+    kind*: int # SymbolKind
+    tags*: seq[int] # SymbolTag
+    deprecated*: Option[bool]
+    range*: Range
+    selectionRange*: Range
+    children*: seq[DocumentSymbolContent]
+
+  DocumentSymbolConfig* = object
+    enabled*: bool
+    symbols*: seq[DocumentSymbolContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -191,6 +205,7 @@ type
     prepareCallHierarchy*: int
     callHierarchyIncoming*: int
     callHierarchyOutgoing*: int
+    documentSymbol*: int
 
   ErrorConfig* = object
     code*: int
@@ -219,6 +234,7 @@ type
     prepareCallHierarchy*: PrepareCallHierarchyConfig
     callHierarchyIncoming*: CallHierarchyIncomingConfig
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
+    documentSymbol*: DocumentSymbolConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -259,6 +275,27 @@ proc parseFromRanges(callNode: JsonNode): seq[Range] =
   if callNode.contains("fromRanges"):
     for rangeNode in callNode["fromRanges"]:
       result.add(parseRange(rangeNode))
+
+proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
+  ## Parses a DocumentSymbol from a JSON node.
+  result = DocumentSymbolContent(
+    name: symbolNode["name"].getStr(""),
+    kind: symbolNode{"kind"}.getInt(0),
+    range: parseRange(symbolNode["range"]),
+    selectionRange: parseRange(symbolNode["selectionRange"]),
+    tags: @[],
+    children: @[],
+  )
+  if symbolNode.hasKey("detail"):
+    result.detail = some(symbolNode["detail"].getStr(""))
+  if symbolNode.hasKey("deprecated"):
+    result.deprecated = some(symbolNode["deprecated"].getBool(false))
+  if symbolNode.contains("tags"):
+    for tagNode in symbolNode["tags"]:
+      result.tags.add(tagNode.getInt(0))
+  if symbolNode.contains("children"):
+    for childNode in symbolNode["children"]:
+      result.children.add(parseDocumentSymbol(childNode))
 
 proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
   # If configPath is empty, don't try to load any file
@@ -1001,6 +1038,20 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.callHierarchyOutgoing =
             CallHierarchyOutgoingConfig(enabled: false, calls: @[])
 
+        if scenarioData.hasKey("documentSymbol"):
+          # Load document symbol configuration
+          let documentSymbolNode = scenarioData["documentSymbol"]
+          var ds =
+            DocumentSymbolConfig(enabled: documentSymbolNode["enabled"].getBool(false))
+          if ds.enabled and documentSymbolNode.contains("symbols"):
+            ds.symbols = @[]
+            for symbolNode in documentSymbolNode["symbols"]:
+              ds.symbols.add(parseDocumentSymbol(symbolNode))
+          scenario.documentSymbol = ds
+        else:
+          # Default document symbol config if not specified
+          scenario.documentSymbol = DocumentSymbolConfig(enabled: false, symbols: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -1022,6 +1073,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             prepareCallHierarchy: delaysNode{"prepareCallHierarchy"}.getInt(0),
             callHierarchyIncoming: delaysNode{"callHierarchyIncoming"}.getInt(0),
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
+            documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -1043,6 +1095,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             prepareCallHierarchy: 0,
             callHierarchyIncoming: 0,
             callHierarchyOutgoing: 0,
+            documentSymbol: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -1090,6 +1143,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     prepareCallHierarchy: PrepareCallHierarchyConfig(enabled: false),
     callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: false),
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
+    documentSymbol: DocumentSymbolConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
   )
@@ -1233,6 +1287,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "prepareCallHierarchy": 40,
           "callHierarchyIncoming": 45,
           "callHierarchyOutgoing": 45,
+          "documentSymbol": 40,
         },
         "semanticTokens": {
           "enabled": true,
@@ -1464,6 +1519,52 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "end": {"line": 2, "character": 15},
               },
               "newText": "    formattedLine",
+            }
+          ],
+        },
+        "documentSymbol": {
+          "enabled": true,
+          "symbols": [
+            {
+              "name": "MyClass",
+              "detail": "class MyClass",
+              "kind": 5,
+              "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": 20, "character": 1},
+              },
+              "selectionRange": {
+                "start": {"line": 0, "character": 6},
+                "end": {"line": 0, "character": 13},
+              },
+              "children": [
+                {
+                  "name": "myMethod",
+                  "detail": "proc myMethod()",
+                  "kind": 6,
+                  "range": {
+                    "start": {"line": 5, "character": 2},
+                    "end": {"line": 10, "character": 3},
+                  },
+                  "selectionRange": {
+                    "start": {"line": 5, "character": 7},
+                    "end": {"line": 5, "character": 15},
+                  },
+                },
+                {
+                  "name": "myField",
+                  "detail": "field: int",
+                  "kind": 8,
+                  "range": {
+                    "start": {"line": 2, "character": 2},
+                    "end": {"line": 2, "character": 12},
+                  },
+                  "selectionRange": {
+                    "start": {"line": 2, "character": 2},
+                    "end": {"line": 2, "character": 9},
+                  },
+                },
+              ],
             }
           ],
         },

@@ -888,6 +888,16 @@ type
     location*: Location
     containerName*: Option[string]
 
+  DocumentSymbol* = ref object of RootObj
+    name*: string
+    detail*: Option[string]
+    kind*: int # SymbolKind
+    tags*: OptionalSeq[int]
+    deprecated*: Option[bool]
+    `range`*: Range
+    selectionRange*: Range
+    children*: OptionalSeq[DocumentSymbol]
+
   CodeActionParams* = ref object of RootObj
     textDocument*: TextDocumentIdentifier
     `range`*: Range

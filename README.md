@@ -63,6 +63,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/prepareCallHierarchy | |
 | callHierarchy/incomingCalls | |
 | callHierarchy/outgoingCalls | |
+| textDocument/documentSymbol | |
 | textDocument/shutdown | |
 
 ## Commands
