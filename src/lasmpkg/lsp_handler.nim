@@ -103,6 +103,9 @@ proc handleInitialize*(
   # Set document formatting provider
   serverCapabilities.documentFormattingProvider = some(true)
 
+  # Set document range formatting provider
+  serverCapabilities.documentRangeFormattingProvider = some(true)
+
   # Set call hierarchy provider
   serverCapabilities.callHierarchyProvider = some(true)
 
@@ -1383,6 +1386,44 @@ proc handleDocumentFormatting*(
     var edits: seq[JsonNode] = @[]
 
     for editContent in scenario.formatting.edits:
+      let textEdit = TextEdit()
+      textEdit.range = editContent.range
+      textEdit.newText = editContent.newText
+      edits.add(%textEdit)
+
+    return %edits
+  else:
+    # Document not found, return empty edits
+    return %(@[])
+
+proc handleDocumentRangeFormatting*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.rangeFormatting > 0:
+    await sleepAsync(scenario.delays.rangeFormatting.milliseconds)
+
+  # Check if range formatting is enabled
+  if not scenario.rangeFormatting.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "rangeFormatting" in scenario.errors:
+    let error = scenario.errors["rangeFormatting"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create range formatting response from scenario configuration
+    var edits: seq[JsonNode] = @[]
+
+    for editContent in scenario.rangeFormatting.edits:
       let textEdit = TextEdit()
       textEdit.range = editContent.range
       textEdit.newText = editContent.newText

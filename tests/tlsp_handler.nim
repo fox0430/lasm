@@ -3486,6 +3486,178 @@ suite "lsp_handler module tests":
     check response["capabilities"].hasKey("documentFormattingProvider")
     check response["capabilities"]["documentFormattingProvider"].getBool() == true
 
+  test "handleDocumentRangeFormatting with disabled range formatting":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # rangeFormatting disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 1, "character": 0}},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
+
+    let response = waitFor handler.handleDocumentRangeFormatting(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentRangeFormatting with enabled range formatting":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].rangeFormatting = RangeFormattingConfig(
+      enabled: true,
+      edits: @[
+        RangeFormattingContent(
+          range: Range(
+            start: Position(line: 2, character: 0),
+            `end`: Position(line: 2, character: 15),
+          ),
+          newText: "    formattedLine",
+        ),
+        RangeFormattingContent(
+          range: Range(
+            start: Position(line: 4, character: 4),
+            `end`: Position(line: 4, character: 10),
+          ),
+          newText: "return;",
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 2, "character": 0}, "end": {"line": 4, "character": 15}},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
+
+    let response = waitFor handler.handleDocumentRangeFormatting(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let firstEdit = response[0]
+    check firstEdit["newText"].getStr() == "    formattedLine"
+    check firstEdit["range"]["start"]["line"].getInt() == 2
+    check firstEdit["range"]["start"]["character"].getInt() == 0
+    check firstEdit["range"]["end"]["line"].getInt() == 2
+    check firstEdit["range"]["end"]["character"].getInt() == 15
+
+    let secondEdit = response[1]
+    check secondEdit["newText"].getStr() == "return;"
+    check secondEdit["range"]["start"]["line"].getInt() == 4
+    check secondEdit["range"]["start"]["character"].getInt() == 4
+    check secondEdit["range"]["end"]["line"].getInt() == 4
+    check secondEdit["range"]["end"]["character"].getInt() == 10
+
+  test "handleDocumentRangeFormatting with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].rangeFormatting =
+      RangeFormattingConfig(enabled: true, edits: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 1, "character": 0}},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
+
+    let response = waitFor handler.handleDocumentRangeFormatting(%1, params)
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleDocumentRangeFormatting with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].rangeFormatting = RangeFormattingConfig(
+      enabled: true,
+      edits: @[
+        RangeFormattingContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 5),
+          ),
+          newText: "hello",
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.rangeFormatting = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentRangeFormatting(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleDocumentRangeFormatting with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].rangeFormatting =
+      RangeFormattingConfig(enabled: true, edits: @[])
+    scenarioManager.scenarios["default"].errors["rangeFormatting"] =
+      ErrorConfig(code: -32603, message: "Range formatting failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 1, "character": 0}},
+      "options": {"tabSize": 4, "insertSpaces": true},
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleDocumentRangeFormatting(%1, params)
+
+  test "range formatting capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentRangeFormattingProvider")
+    check response["capabilities"]["documentRangeFormattingProvider"].getBool() == true
+
   test "handleDidSave with text updates document":
     let sm = createTestScenarioManager()
     let handler = newLSPHandler(sm)

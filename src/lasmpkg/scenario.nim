@@ -165,6 +165,14 @@ type
     enabled*: bool
     edits*: seq[FormattingContent]
 
+  RangeFormattingContent* = object
+    range*: Range
+    newText*: string
+
+  RangeFormattingConfig* = object
+    enabled*: bool
+    edits*: seq[RangeFormattingContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -179,6 +187,7 @@ type
     documentHighlight*: int
     rename*: int
     formatting*: int
+    rangeFormatting*: int
     prepareCallHierarchy*: int
     callHierarchyIncoming*: int
     callHierarchyOutgoing*: int
@@ -206,6 +215,7 @@ type
     documentHighlight*: DocumentHighlightConfig
     rename*: RenameConfig
     formatting*: FormattingConfig
+    rangeFormatting*: RangeFormattingConfig
     prepareCallHierarchy*: PrepareCallHierarchyConfig
     callHierarchyIncoming*: CallHierarchyIncomingConfig
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
@@ -915,6 +925,27 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default formatting config if not specified
           scenario.formatting = FormattingConfig(enabled: false, edits: @[])
 
+        if scenarioData.hasKey("rangeFormatting"):
+          # Load rangeFormatting configuration
+          let rangeFormattingNode = scenarioData["rangeFormatting"]
+          var rfc = RangeFormattingConfig(
+            enabled: rangeFormattingNode["enabled"].getBool(false)
+          )
+          if rfc.enabled:
+            # Handle edits
+            if rangeFormattingNode.contains("edits"):
+              rfc.edits = @[]
+              for editNode in rangeFormattingNode["edits"]:
+                let rangeFormattingContent = RangeFormattingContent(
+                  newText: editNode["newText"].getStr(""),
+                  range: parseRange(editNode["range"]),
+                )
+                rfc.edits.add(rangeFormattingContent)
+          scenario.rangeFormatting = rfc
+        else:
+          # Default rangeFormatting config if not specified
+          scenario.rangeFormatting = RangeFormattingConfig(enabled: false, edits: @[])
+
         if scenarioData.hasKey("prepareCallHierarchy"):
           # Load prepare call hierarchy configuration
           let prepareNode = scenarioData["prepareCallHierarchy"]
@@ -987,6 +1018,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
             rename: delaysNode{"rename"}.getInt(0),
             formatting: delaysNode{"formatting"}.getInt(0),
+            rangeFormatting: delaysNode{"rangeFormatting"}.getInt(0),
             prepareCallHierarchy: delaysNode{"prepareCallHierarchy"}.getInt(0),
             callHierarchyIncoming: delaysNode{"callHierarchyIncoming"}.getInt(0),
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
@@ -1007,6 +1039,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentHighlight: 0,
             rename: 0,
             formatting: 0,
+            rangeFormatting: 0,
             prepareCallHierarchy: 0,
             callHierarchyIncoming: 0,
             callHierarchyOutgoing: 0,
@@ -1053,6 +1086,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     documentHighlight: DocumentHighlightConfig(enabled: false),
     rename: RenameConfig(enabled: false),
     formatting: FormattingConfig(enabled: false),
+    rangeFormatting: RangeFormattingConfig(enabled: false),
     prepareCallHierarchy: PrepareCallHierarchyConfig(enabled: false),
     callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: false),
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
@@ -1195,6 +1229,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "documentHighlight": 45,
           "rename": 60,
           "formatting": 40,
+          "rangeFormatting": 40,
           "prepareCallHierarchy": 40,
           "callHierarchyIncoming": 45,
           "callHierarchyOutgoing": 45,
@@ -1418,6 +1453,18 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "newText": "    return;",
             },
+          ],
+        },
+        "rangeFormatting": {
+          "enabled": true,
+          "edits": [
+            {
+              "range": {
+                "start": {"line": 2, "character": 0},
+                "end": {"line": 2, "character": 15},
+              },
+              "newText": "    formattedLine",
+            }
           ],
         },
       },

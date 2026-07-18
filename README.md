@@ -59,6 +59,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/documentHighlight | |
 | textDocument/rename | |
 | textDocument/formatting | |
+| textDocument/rangeFormatting | |
 | textDocument/prepareCallHierarchy | |
 | callHierarchy/incomingCalls | |
 | callHierarchy/outgoingCalls | |
