@@ -187,6 +187,15 @@ type
     enabled*: bool
     symbols*: seq[DocumentSymbolContent]
 
+  DocumentLinkContent* = object
+    range*: Range
+    target*: Option[string]
+    tooltip*: Option[string]
+
+  DocumentLinkConfig* = object
+    enabled*: bool
+    links*: seq[DocumentLinkContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -206,6 +215,7 @@ type
     callHierarchyIncoming*: int
     callHierarchyOutgoing*: int
     documentSymbol*: int
+    documentLink*: int
 
   ErrorConfig* = object
     code*: int
@@ -235,6 +245,7 @@ type
     callHierarchyIncoming*: CallHierarchyIncomingConfig
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     documentSymbol*: DocumentSymbolConfig
+    documentLink*: DocumentLinkConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -275,6 +286,14 @@ proc parseFromRanges(callNode: JsonNode): seq[Range] =
   if callNode.contains("fromRanges"):
     for rangeNode in callNode["fromRanges"]:
       result.add(parseRange(rangeNode))
+
+proc parseDocumentLink(linkNode: JsonNode): DocumentLinkContent =
+  ## Parses a DocumentLink from a JSON node.
+  result = DocumentLinkContent(range: parseRange(linkNode["range"]))
+  if linkNode.hasKey("target"):
+    result.target = some(linkNode["target"].getStr(""))
+  if linkNode.hasKey("tooltip"):
+    result.tooltip = some(linkNode["tooltip"].getStr(""))
 
 proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
   ## Parses a DocumentSymbol from a JSON node.
@@ -1052,6 +1071,20 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default document symbol config if not specified
           scenario.documentSymbol = DocumentSymbolConfig(enabled: false, symbols: @[])
 
+        if scenarioData.hasKey("documentLink"):
+          # Load document link configuration
+          let documentLinkNode = scenarioData["documentLink"]
+          var dl =
+            DocumentLinkConfig(enabled: documentLinkNode["enabled"].getBool(false))
+          if dl.enabled and documentLinkNode.contains("links"):
+            dl.links = @[]
+            for linkNode in documentLinkNode["links"]:
+              dl.links.add(parseDocumentLink(linkNode))
+          scenario.documentLink = dl
+        else:
+          # Default document link config if not specified
+          scenario.documentLink = DocumentLinkConfig(enabled: false, links: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -1074,6 +1107,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyIncoming: delaysNode{"callHierarchyIncoming"}.getInt(0),
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
+            documentLink: delaysNode{"documentLink"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -1096,6 +1130,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyIncoming: 0,
             callHierarchyOutgoing: 0,
             documentSymbol: 0,
+            documentLink: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -1144,6 +1179,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: false),
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     documentSymbol: DocumentSymbolConfig(enabled: false),
+    documentLink: DocumentLinkConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
   )
@@ -1288,6 +1324,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "callHierarchyIncoming": 45,
           "callHierarchyOutgoing": 45,
           "documentSymbol": 40,
+          "documentLink": 40,
         },
         "semanticTokens": {
           "enabled": true,
@@ -1566,6 +1603,26 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 },
               ],
             }
+          ],
+        },
+        "documentLink": {
+          "enabled": true,
+          "links": [
+            {
+              "range": {
+                "start": {"line": 0, "character": 4},
+                "end": {"line": 0, "character": 24},
+              },
+              "target": "https://example.com/docs",
+              "tooltip": "Open documentation",
+            },
+            {
+              "range": {
+                "start": {"line": 3, "character": 10},
+                "end": {"line": 3, "character": 30},
+              },
+              "target": "file:///path/to/other.nim",
+            },
           ],
         },
       },

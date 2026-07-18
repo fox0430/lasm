@@ -923,6 +923,7 @@ type
   DocumentLink* = ref object of RootObj
     `range`*: Range
     target*: Option[string]
+    tooltip*: Option[string]
     data*: OptionalNode
 
   DocumentLinkRegistrationOptions* = ref object of TextDocumentRegistrationOptions

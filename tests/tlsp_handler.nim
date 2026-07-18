@@ -3955,3 +3955,146 @@ suite "lsp_handler module tests":
     check response.hasKey("capabilities")
     check response["capabilities"].hasKey("documentSymbolProvider")
     check response["capabilities"]["documentSymbolProvider"].getBool() == true
+
+  test "handleDocumentLink with disabled document link":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # documentLink disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    # Add a test document
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleDocumentLink(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentLink with enabled document link":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentLink = DocumentLinkConfig(
+      enabled: true,
+      links: @[
+        DocumentLinkContent(
+          range: Range(
+            start: Position(line: 0, character: 4),
+            `end`: Position(line: 0, character: 24),
+          ),
+          target: some("https://example.com/docs"),
+          tooltip: some("Open documentation"),
+        ),
+        DocumentLinkContent(
+          range: Range(
+            start: Position(line: 3, character: 10),
+            `end`: Position(line: 3, character: 30),
+          ),
+          target: some("file:///path/to/other.nim"),
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleDocumentLink(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let firstLink = response[0]
+    check firstLink["range"]["start"]["line"].getInt() == 0
+    check firstLink["range"]["start"]["character"].getInt() == 4
+    check firstLink["range"]["end"]["character"].getInt() == 24
+    check firstLink["target"].getStr() == "https://example.com/docs"
+    check firstLink["tooltip"].getStr() == "Open documentation"
+
+    let secondLink = response[1]
+    check secondLink["target"].getStr() == "file:///path/to/other.nim"
+    check not secondLink.hasKey("tooltip")
+
+  test "handleDocumentLink with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentLink =
+      DocumentLinkConfig(enabled: true, links: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"textDocument": {"uri": "file:///unknown.nim"}}
+
+    let response = waitFor handler.handleDocumentLink(%1, params)
+    check response.kind == JNull
+
+  test "handleDocumentLink with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentLink = DocumentLinkConfig(
+      enabled: true,
+      links: @[
+        DocumentLinkContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 8),
+          ),
+          target: some("https://example.com"),
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.documentLink = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentLink(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleDocumentLink with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].documentLink =
+      DocumentLinkConfig(enabled: true, links: @[])
+    scenarioManager.scenarios["default"].errors["documentLink"] =
+      ErrorConfig(code: -32603, message: "Document link failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    expect(LSPError):
+      discard waitFor handler.handleDocumentLink(%1, params)
+
+  test "document link capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentLinkProvider")
+    check response["capabilities"]["documentLinkProvider"].hasKey("resolveProvider")
+    check response["capabilities"]["documentLinkProvider"]["resolveProvider"].getBool() ==
+      false
