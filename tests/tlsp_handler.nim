@@ -4261,3 +4261,185 @@ suite "lsp_handler module tests":
         found = true
         break
     check found
+
+  test "handleSignatureHelp with disabled signature help":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # signatureHelp disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handleSignatureHelp(%1, params)
+    check response.kind == JNull
+
+  test "handleSignatureHelp with enabled signature help":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].signatureHelp = SignatureHelpConfig(
+      enabled: true,
+      activeSignature: some(0),
+      activeParameter: some(1),
+      triggerCharacters: @["(", ","],
+      retriggerCharacters: @[","],
+      signatures: @[
+        SignatureInformationContent(
+          label: "func add(a: int, b: int): int",
+          documentation: some("Adds two integers"),
+          activeParameter: some(0),
+          parameters: @[
+            ParameterInformationContent(
+              label: "a: int", documentation: some("The first integer")
+            ),
+            ParameterInformationContent(
+              label: "b: int", documentation: some("The second integer")
+            ),
+          ],
+        ),
+        SignatureInformationContent(
+          label: "func println(message: string)",
+          parameters: @[ParameterInformationContent(label: "message: string")],
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
+
+    let response = waitFor handler.handleSignatureHelp(%1, params)
+    check response.kind == JObject
+    check response["activeSignature"].getInt() == 0
+    check response["activeParameter"].getInt() == 1
+
+    check response["signatures"].kind == JArray
+    check response["signatures"].len == 2
+
+    let firstSig = response["signatures"][0]
+    check firstSig["label"].getStr() == "func add(a: int, b: int): int"
+    check firstSig["documentation"].getStr() == "Adds two integers"
+    check firstSig["activeParameter"].getInt() == 0
+    check firstSig["parameters"].kind == JArray
+    check firstSig["parameters"].len == 2
+    check firstSig["parameters"][0]["label"].getStr() == "a: int"
+    check firstSig["parameters"][0]["documentation"].getStr() == "The first integer"
+    check firstSig["parameters"][1]["label"].getStr() == "b: int"
+
+    let secondSig = response["signatures"][1]
+    check secondSig["label"].getStr() == "func println(message: string)"
+    check not secondSig.hasKey("documentation")
+    check not secondSig.hasKey("activeParameter")
+    check secondSig["parameters"].len == 1
+    check secondSig["parameters"][0]["label"].getStr() == "message: string"
+    check not secondSig["parameters"][0].hasKey("documentation")
+
+  test "handleSignatureHelp with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].signatureHelp =
+      SignatureHelpConfig(enabled: true, signatures: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handleSignatureHelp(%1, params)
+    check response.kind == JNull
+
+  test "handleSignatureHelp with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].signatureHelp = SignatureHelpConfig(
+      enabled: true,
+      signatures: @[SignatureInformationContent(label: "func f()", parameters: @[])],
+    )
+    scenarioManager.scenarios["default"].delays.signatureHelp = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleSignatureHelp(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JObject
+    check response["signatures"].len == 1
+
+  test "handleSignatureHelp with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].signatureHelp =
+      SignatureHelpConfig(enabled: true, signatures: @[])
+    scenarioManager.scenarios["default"].errors["signatureHelp"] =
+      ErrorConfig(code: -32603, message: "Signature help failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleSignatureHelp(%1, params)
+
+  test "signature help capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].signatureHelp = SignatureHelpConfig(
+      enabled: true, triggerCharacters: @["(", ","], retriggerCharacters: @[","]
+    )
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("signatureHelpProvider")
+    let sigProvider = response["capabilities"]["signatureHelpProvider"]
+    check sigProvider.hasKey("triggerCharacters")
+    check sigProvider["triggerCharacters"].kind == JArray
+    check sigProvider["triggerCharacters"].len == 2
+    check sigProvider["triggerCharacters"][0].getStr() == "("
+    check sigProvider["triggerCharacters"][1].getStr() == ","
+
+  test "signature help capability uses defaults when scenario provides none":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response["capabilities"].hasKey("signatureHelpProvider")
+    let sigProvider = response["capabilities"]["signatureHelpProvider"]
+    check sigProvider["triggerCharacters"].kind == JArray
+    check sigProvider["triggerCharacters"].len == 2

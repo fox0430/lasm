@@ -50,6 +50,16 @@ proc handleInitialize*(
   # Set hover provider
   serverCapabilities.hoverProvider = some(true)
 
+  # Set signature help provider
+  let signatureHelpOptions = SignatureHelpOptions()
+  let currentScenario = handler.scenarioManager.getCurrentScenario()
+  if currentScenario.signatureHelp.triggerCharacters.len > 0:
+    signatureHelpOptions.triggerCharacters =
+      some(currentScenario.signatureHelp.triggerCharacters)
+  else:
+    signatureHelpOptions.triggerCharacters = some(@["(", ","])
+  serverCapabilities.signatureHelpProvider = signatureHelpOptions
+
   # Set execute command provider
   let executeCommandOptions = ExecuteCommandOptions()
   executeCommandOptions.commands = some(
@@ -1583,6 +1593,62 @@ proc handleDocumentLink*(
     for linkContent in scenario.documentLink.links:
       links.add(toDocumentLinkJson(linkContent))
     return %links
+  else:
+    # Document not found
+    return newJNull()
+
+proc toParameterInformationJson(c: ParameterInformationContent): JsonNode =
+  result = newJObject()
+  result["label"] = %c.label
+  if c.documentation.isSome:
+    result["documentation"] = %c.documentation.get
+
+proc toSignatureInformationJson(c: SignatureInformationContent): JsonNode =
+  result = newJObject()
+  result["label"] = %c.label
+  if c.documentation.isSome:
+    result["documentation"] = %c.documentation.get
+  if c.activeParameter.isSome:
+    result["activeParameter"] = %c.activeParameter.get
+  var paramsJson = newJArray()
+  for param in c.parameters:
+    paramsJson.add(toParameterInformationJson(param))
+  result["parameters"] = paramsJson
+
+proc handleSignatureHelp*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.signatureHelp > 0:
+    await sleepAsync(scenario.delays.signatureHelp.milliseconds)
+
+  # Check if signature help is enabled
+  if not scenario.signatureHelp.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "signatureHelp" in scenario.errors:
+    let error = scenario.errors["signatureHelp"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create signature help response from scenario configuration
+    result = newJObject()
+    var signaturesJson = newJArray()
+    for sigContent in scenario.signatureHelp.signatures:
+      signaturesJson.add(toSignatureInformationJson(sigContent))
+    result["signatures"] = signaturesJson
+    if scenario.signatureHelp.activeSignature.isSome:
+      result["activeSignature"] = %scenario.signatureHelp.activeSignature.get
+    if scenario.signatureHelp.activeParameter.isSome:
+      result["activeParameter"] = %scenario.signatureHelp.activeParameter.get
   else:
     # Document not found
     return newJNull()

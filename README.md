@@ -65,6 +65,7 @@ See `lsp-test-config-sample.json` for examples.
 | callHierarchy/outgoingCalls | |
 | textDocument/documentSymbol | |
 | textDocument/documentLink | |
+| textDocument/signatureHelp | |
 | $/progress | Server-sent notification; trigger via `lsptest.sendProgress` |
 | textDocument/shutdown | |
 
