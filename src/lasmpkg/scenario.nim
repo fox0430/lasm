@@ -196,6 +196,19 @@ type
     enabled*: bool
     links*: seq[DocumentLinkContent]
 
+  ProgressNotificationContent* = object
+    kind*: string # "begin" | "report" | "end"
+    title*: Option[string]
+    message*: Option[string]
+    percentage*: Option[int]
+    cancellable*: Option[bool]
+    delay*: int # ms to wait before sending this notification
+
+  ProgressConfig* = object
+    enabled*: bool
+    token*: string
+    notifications*: seq[ProgressNotificationContent]
+
   DelayConfig* = object
     hover*: int
     completion*: int
@@ -216,6 +229,7 @@ type
     callHierarchyOutgoing*: int
     documentSymbol*: int
     documentLink*: int
+    progress*: int
 
   ErrorConfig* = object
     code*: int
@@ -246,6 +260,7 @@ type
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     documentSymbol*: DocumentSymbolConfig
     documentLink*: DocumentLinkConfig
+    progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
 
@@ -294,6 +309,20 @@ proc parseDocumentLink(linkNode: JsonNode): DocumentLinkContent =
     result.target = some(linkNode["target"].getStr(""))
   if linkNode.hasKey("tooltip"):
     result.tooltip = some(linkNode["tooltip"].getStr(""))
+
+proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent =
+  ## Parses a progress notification entry from a JSON node.
+  result = ProgressNotificationContent(
+    kind: notifNode{"kind"}.getStr("report"), delay: notifNode{"delay"}.getInt(0)
+  )
+  if notifNode.hasKey("title"):
+    result.title = some(notifNode["title"].getStr(""))
+  if notifNode.hasKey("message"):
+    result.message = some(notifNode["message"].getStr(""))
+  if notifNode.hasKey("percentage"):
+    result.percentage = some(notifNode["percentage"].getInt(0))
+  if notifNode.hasKey("cancellable"):
+    result.cancellable = some(notifNode["cancellable"].getBool(false))
 
 proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
   ## Parses a DocumentSymbol from a JSON node.
@@ -1085,6 +1114,23 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default document link config if not specified
           scenario.documentLink = DocumentLinkConfig(enabled: false, links: @[])
 
+        if scenarioData.hasKey("progress"):
+          # Load progress configuration
+          let progressNode = scenarioData["progress"]
+          var pg = ProgressConfig(
+            enabled: progressNode["enabled"].getBool(false),
+            token: progressNode{"token"}.getStr(""),
+          )
+          if pg.enabled and progressNode.contains("notifications"):
+            pg.notifications = @[]
+            for notifNode in progressNode["notifications"]:
+              pg.notifications.add(parseProgressNotification(notifNode))
+          scenario.progress = pg
+        else:
+          # Default progress config if not specified
+          scenario.progress =
+            ProgressConfig(enabled: false, token: "", notifications: @[])
+
         if scenarioData.hasKey("delays"):
           # Load delay configuration
           let delaysNode = scenarioData["delays"]
@@ -1108,6 +1154,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
+            progress: delaysNode{"progress"}.getInt(0),
           )
         else:
           # Default delay config if not specified
@@ -1131,6 +1178,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: 0,
             documentSymbol: 0,
             documentLink: 0,
+            progress: 0,
           )
 
         if scenarioData.hasKey("errors"):
@@ -1180,6 +1228,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     documentSymbol: DocumentSymbolConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
+    progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
   )
@@ -1325,6 +1374,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "callHierarchyOutgoing": 45,
           "documentSymbol": 40,
           "documentLink": 40,
+          "progress": 0,
         },
         "semanticTokens": {
           "enabled": true,
@@ -1623,6 +1673,27 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "target": "file:///path/to/other.nim",
             },
+          ],
+        },
+        "progress": {
+          "enabled": true,
+          "token": "lasm-progress-1",
+          "notifications": [
+            {
+              "kind": "begin",
+              "title": "Indexing",
+              "message": "Starting",
+              "percentage": 0,
+              "cancellable": false,
+              "delay": 0,
+            },
+            {
+              "kind": "report",
+              "message": "Halfway there",
+              "percentage": 50,
+              "delay": 200,
+            },
+            {"kind": "end", "message": "Done", "delay": 200},
           ],
         },
       },

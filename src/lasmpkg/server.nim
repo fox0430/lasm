@@ -18,6 +18,10 @@ type
     lspHandler*: LSPHandler
     pendingRequests*: Table[string, PendingRequest]
 
+proc sendNotification*(
+  server: LSPServer, methodName: string, params: JsonNode
+) {.async.}
+
 proc newLSPServer*(configPath: string = "", transport: Transport = nil): LSPServer =
   ## LSP Server Implementation
   logInfo("Creating new LSP server with config: " & configPath)
@@ -36,6 +40,12 @@ proc newLSPServer*(configPath: string = "", transport: Transport = nil): LSPServ
   logInfo("Initializing scenario manager")
   let scenarioManager = newScenarioManager(configPath)
   result.lspHandler = newLSPHandler(scenarioManager)
+
+  let srv = result
+  result.lspHandler.sendNotification = proc(
+      methodName: string, params: JsonNode
+  ): Future[void] {.async.} =
+    await srv.sendNotification(methodName, params)
 
   logInfo("LSP server created successfully")
 

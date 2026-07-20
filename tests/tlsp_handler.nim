@@ -5,6 +5,13 @@ import pkg/chronos
 import ../src/lasmpkg/[lsp_handler, scenario, logger]
 import ../src/lasmpkg/protocol/types
 
+var capturedProgressNotifications {.threadvar.}: seq[(string, JsonNode)]
+
+proc captureProgressNotification(
+    methodName: string, params: JsonNode
+): Future[void] {.async.} =
+  capturedProgressNotifications.add((methodName, params))
+
 proc createTestScenarioManager(): ScenarioManager =
   result = ScenarioManager()
   result.currentScenario = "default"
@@ -532,15 +539,15 @@ suite "lsp_handler module tests":
     let executeCommandProvider = capabilities["executeCommandProvider"]
     check executeCommandProvider.hasKey("commands")
     let commands = executeCommandProvider["commands"]
-    check commands.len == 5
+    check commands.len == 6
     var foundCommands = 0
     for cmd in commands:
       if cmd.getStr() in [
         "lsptest.switchScenario", "lsptest.listScenarios", "lsptest.reloadConfig",
-        "lsptest.createSampleConfig", "lsptest.listOpenFiles",
+        "lsptest.createSampleConfig", "lsptest.listOpenFiles", "lsptest.sendProgress",
       ]:
         foundCommands += 1
-    check foundCommands == 5
+    check foundCommands == 6
 
   test "handleExecuteCommand - switchScenario success":
     let sm = createTestScenarioManager()
@@ -4098,3 +4105,159 @@ suite "lsp_handler module tests":
     check response["capabilities"]["documentLinkProvider"].hasKey("resolveProvider")
     check response["capabilities"]["documentLinkProvider"]["resolveProvider"].getBool() ==
       false
+
+  test "sendProgress with disabled progress does nothing":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # progress disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    capturedProgressNotifications = @[]
+    handler.sendNotification = captureProgressNotification
+
+    waitFor handler.sendProgress()
+    check capturedProgressNotifications.len == 0
+
+  test "sendProgress emits begin/report/end $/progress notifications":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].progress = ProgressConfig(
+      enabled: true,
+      token: "tok-1",
+      notifications: @[
+        ProgressNotificationContent(
+          kind: "begin",
+          title: some("Indexing"),
+          message: some("Starting"),
+          percentage: some(0),
+          cancellable: some(false),
+          delay: 0,
+        ),
+        ProgressNotificationContent(
+          kind: "report", message: some("Halfway"), percentage: some(50), delay: 0
+        ),
+        ProgressNotificationContent(kind: "end", message: some("Done"), delay: 0),
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    capturedProgressNotifications = @[]
+    handler.sendNotification = captureProgressNotification
+
+    waitFor handler.sendProgress()
+
+    check capturedProgressNotifications.len == 3
+    for entry in capturedProgressNotifications:
+      check entry[0] == "$/progress"
+      check entry[1]["token"].getStr() == "tok-1"
+
+    let beginValue = capturedProgressNotifications[0][1]["value"]
+    check beginValue["kind"].getStr() == "begin"
+    check beginValue["title"].getStr() == "Indexing"
+    check beginValue["message"].getStr() == "Starting"
+    check beginValue["percentage"].getInt() == 0
+    check beginValue["cancellable"].getBool() == false
+
+    let reportValue = capturedProgressNotifications[1][1]["value"]
+    check reportValue["kind"].getStr() == "report"
+    check reportValue["message"].getStr() == "Halfway"
+    check reportValue["percentage"].getInt() == 50
+    check not reportValue.hasKey("title")
+
+    let endValue = capturedProgressNotifications[2][1]["value"]
+    check endValue["kind"].getStr() == "end"
+    check endValue["message"].getStr() == "Done"
+    check not endValue.hasKey("percentage")
+    check not endValue.hasKey("cancellable")
+
+  test "sendProgress honors per-notification delays":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].progress = ProgressConfig(
+      enabled: true,
+      token: "tok-delay",
+      notifications: @[
+        ProgressNotificationContent(kind: "begin", title: some("Working"), delay: 0),
+        ProgressNotificationContent(kind: "end", delay: 100),
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    capturedProgressNotifications = @[]
+    handler.sendNotification = captureProgressNotification
+
+    let startTime = getTime()
+    waitFor handler.sendProgress()
+    let duration = (getTime() - startTime).inMilliseconds
+
+    check duration >= 95
+    check capturedProgressNotifications.len == 2
+
+  test "sendProgress raises when error is injected":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].progress =
+      ProgressConfig(enabled: true, token: "tok-err", notifications: @[])
+    scenarioManager.scenarios["default"].errors["progress"] =
+      ErrorConfig(code: -32603, message: "Progress failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.sendNotification = captureProgressNotification
+
+    expect(LSPError):
+      waitFor handler.sendProgress()
+
+  test "lsptest.sendProgress command triggers notifications":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].progress = ProgressConfig(
+      enabled: true,
+      token: "tok-cmd",
+      notifications: @[
+        ProgressNotificationContent(kind: "begin", title: some("Loading"), delay: 0),
+        ProgressNotificationContent(kind: "end", delay: 0),
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    capturedProgressNotifications = @[]
+    handler.sendNotification = captureProgressNotification
+
+    let params = %*{"command": "lsptest.sendProgress"}
+    let (response, notifications) = waitFor handler.handleExecuteCommand(%1, params)
+
+    check response["success"].getBool() == true
+    check response["token"].getStr() == "tok-cmd"
+    check notifications.len == 0
+    check capturedProgressNotifications.len == 2
+    check capturedProgressNotifications[0][1]["value"]["kind"].getStr() == "begin"
+    check capturedProgressNotifications[1][1]["value"]["kind"].getStr() == "end"
+
+  test "lsptest.sendProgress command fails when progress disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"command": "lsptest.sendProgress"}
+
+    expect(LSPError):
+      discard waitFor handler.handleExecuteCommand(%1, params)
+
+  test "sendProgress command listed in initialize capabilities":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    let commands = response["capabilities"]["executeCommandProvider"]["commands"]
+    var found = false
+    for c in commands:
+      if c.getStr() == "lsptest.sendProgress":
+        found = true
+        break
+    check found
