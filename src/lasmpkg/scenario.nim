@@ -258,6 +258,38 @@ type
     enabled*: bool
     lenses*: seq[CodeLensContent]
 
+  CodeActionCommandContent* = object
+    title*: string
+    command*: string
+    arguments*: Option[JsonNode]
+
+  CodeActionEditChange* = object
+    uri*: string
+    edits*: seq[TextEdit]
+
+  CodeActionDocumentChange* = object
+    textDocument*: VersionedTextDocumentIdentifier
+    edits*: seq[TextEdit]
+
+  CodeActionWorkspaceEdit* = object
+    changes*: seq[CodeActionEditChange]
+    documentChanges*: seq[CodeActionDocumentChange]
+
+  CodeActionContent* = object
+    title*: string
+    kind*: Option[string] # CodeActionKind
+    diagnostics*: Option[JsonNode]
+    isPreferred*: Option[bool]
+    disabled*: Option[string] # reason string
+    edit*: Option[CodeActionWorkspaceEdit]
+    command*: Option[CodeActionCommandContent]
+    data*: Option[JsonNode]
+
+  CodeActionConfig* = object
+    enabled*: bool
+    codeActionKinds*: seq[string]
+    actions*: seq[CodeActionContent]
+
   ProgressNotificationContent* = object
     kind*: string # "begin" | "report" | "end"
     title*: Option[string]
@@ -296,6 +328,7 @@ type
     selectionRange*: int
     foldingRange*: int
     codeLens*: int
+    codeAction*: int
     progress*: int
 
   ErrorConfig* = object
@@ -332,6 +365,7 @@ type
     selectionRange*: SelectionRangeConfig
     foldingRange*: FoldingRangeConfig
     codeLens*: CodeLensConfig
+    codeAction*: CodeActionConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -420,6 +454,58 @@ proc parseCodeLens(lensNode: JsonNode): CodeLensContent =
     result.command = some(cmd)
   if lensNode.hasKey("data"):
     result.data = some(lensNode["data"])
+
+proc parseTextEditContent(editNode: JsonNode): TextEdit =
+  ## Parses a TextEdit from a JSON node.
+  result = TextEdit()
+  result.newText = editNode{"newText"}.getStr("")
+  result.range = parseRange(editNode["range"])
+
+proc parseCodeAction(actionNode: JsonNode): CodeActionContent =
+  ## Parses a CodeAction from a JSON node. Only `title` is required;
+  ## every other field is optional per the LSP spec.
+  result = CodeActionContent(title: actionNode{"title"}.getStr(""))
+  if actionNode.hasKey("kind"):
+    result.kind = some(actionNode["kind"].getStr(""))
+  if actionNode.hasKey("diagnostics"):
+    result.diagnostics = some(actionNode["diagnostics"])
+  if actionNode.hasKey("isPreferred"):
+    result.isPreferred = some(actionNode["isPreferred"].getBool(false))
+  if actionNode.hasKey("disabled") and actionNode["disabled"].kind == JObject:
+    result.disabled = some(actionNode["disabled"]{"reason"}.getStr(""))
+  if actionNode.hasKey("edit") and actionNode["edit"].kind == JObject:
+    let editNode = actionNode["edit"]
+    var we = CodeActionWorkspaceEdit(changes: @[], documentChanges: @[])
+    if editNode.contains("changes") and editNode["changes"].kind == JArray:
+      for changeNode in editNode["changes"]:
+        var change = CodeActionEditChange(uri: changeNode{"uri"}.getStr(""), edits: @[])
+        if changeNode.contains("edits"):
+          for e in changeNode["edits"]:
+            change.edits.add(parseTextEditContent(e))
+        we.changes.add(change)
+    if editNode.contains("documentChanges") and
+        editNode["documentChanges"].kind == JArray:
+      for docChangeNode in editNode["documentChanges"]:
+        var docChange = CodeActionDocumentChange(edits: @[])
+        docChange.textDocument = VersionedTextDocumentIdentifier()
+        docChange.textDocument.uri = docChangeNode["textDocument"]{"uri"}.getStr("")
+        docChange.textDocument.version =
+          some(%docChangeNode["textDocument"]{"version"}.getInt(1))
+        if docChangeNode.contains("edits"):
+          for e in docChangeNode["edits"]:
+            docChange.edits.add(parseTextEditContent(e))
+        we.documentChanges.add(docChange)
+    result.edit = some(we)
+  if actionNode.hasKey("command") and actionNode["command"].kind == JObject:
+    let cmdNode = actionNode["command"]
+    var cmd = CodeActionCommandContent(
+      title: cmdNode{"title"}.getStr(""), command: cmdNode{"command"}.getStr("")
+    )
+    if cmdNode.hasKey("arguments"):
+      cmd.arguments = some(cmdNode["arguments"])
+    result.command = some(cmd)
+  if actionNode.hasKey("data"):
+    result.data = some(actionNode["data"])
 
 proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent =
   ## Parses a progress notification entry from a JSON node.
@@ -1341,6 +1427,26 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default code lens config if not specified
           scenario.codeLens = CodeLensConfig(enabled: false, lenses: @[])
 
+        if scenarioData.hasKey("codeAction"):
+          # Load code action configuration
+          let codeActionNode = scenarioData["codeAction"]
+          var ca = CodeActionConfig(
+            enabled: codeActionNode["enabled"].getBool(false),
+            codeActionKinds: @[],
+            actions: @[],
+          )
+          if codeActionNode.contains("codeActionKinds"):
+            for kindNode in codeActionNode["codeActionKinds"]:
+              ca.codeActionKinds.add(kindNode.getStr(""))
+          if ca.enabled and codeActionNode.contains("actions"):
+            for actionNode in codeActionNode["actions"]:
+              ca.actions.add(parseCodeAction(actionNode))
+          scenario.codeAction = ca
+        else:
+          # Default code action config if not specified
+          scenario.codeAction =
+            CodeActionConfig(enabled: false, codeActionKinds: @[], actions: @[])
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1386,6 +1492,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
             foldingRange: delaysNode{"foldingRange"}.getInt(0),
             codeLens: delaysNode{"codeLens"}.getInt(0),
+            codeAction: delaysNode{"codeAction"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1415,6 +1522,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             selectionRange: 0,
             foldingRange: 0,
             codeLens: 0,
+            codeAction: 0,
             progress: 0,
           )
 
@@ -1470,6 +1578,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     selectionRange: SelectionRangeConfig(enabled: false),
     foldingRange: FoldingRangeConfig(enabled: false),
     codeLens: CodeLensConfig(enabled: false),
+    codeAction: CodeActionConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1621,6 +1730,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "selectionRange": 30,
           "foldingRange": 30,
           "codeLens": 30,
+          "codeAction": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -2010,6 +2120,43 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "command": {"title": "Run test", "command": "lasm.runTest"},
               "data": {"testId": "sample-1"},
+            },
+          ],
+        },
+        "codeAction": {
+          "enabled": true,
+          "codeActionKinds": ["quickfix", "refactor", "source"],
+          "actions": [
+            {
+              "title": "Fix typo",
+              "kind": "quickfix",
+              "isPreferred": true,
+              "edit": {
+                "changes": [
+                  {
+                    "uri": "file:///path/to/test.nim",
+                    "edits": [
+                      {
+                        "range": {
+                          "start": {"line": 0, "character": 0},
+                          "end": {"line": 0, "character": 5},
+                        },
+                        "newText": "fixed",
+                      }
+                    ],
+                  }
+                ]
+              },
+            },
+            {
+              "title": "Refactor: extract function",
+              "kind": "refactor.extract",
+              "command": {
+                "title": "Extract",
+                "command": "lasm.extractFunction",
+                "arguments": ["file:///path/to/test.nim"],
+              },
+              "data": {"actionId": "sample-1"},
             },
           ],
         },

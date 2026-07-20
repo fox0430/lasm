@@ -69,6 +69,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/selectionRange | |
 | textDocument/foldingRange | |
 | textDocument/codeLens | |
+| textDocument/codeAction | |
 | textDocument/semanticTokens/full/delta | |
 | $/progress | Server-sent notification; trigger via `lsptest.sendProgress` |
 | textDocument/shutdown | |

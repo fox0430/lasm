@@ -140,6 +140,12 @@ proc handleInitialize*(
   # Set code lens provider
   serverCapabilities.codeLensProvider = CodeLensOptions(resolveProvider: some(false))
 
+  # Set code action provider
+  let codeActionOptions = CodeActionOptions(resolveProvider: some(false))
+  if currentScenario.codeAction.codeActionKinds.len > 0:
+    codeActionOptions.codeActionKinds = some(currentScenario.codeAction.codeActionKinds)
+  serverCapabilities.codeActionProvider = some(%codeActionOptions)
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1843,6 +1849,95 @@ proc handleCodeLens*(
     result = newJArray()
     for lensContent in scenario.codeLens.lenses:
       result.add(toCodeLensJson(lensContent))
+  else:
+    # Document not found
+    return newJNull()
+
+proc toTextEditJson(edit: TextEdit): JsonNode =
+  result = newJObject()
+  result["range"] = %edit.range
+  result["newText"] = %edit.newText
+
+proc toCodeActionWorkspaceEditJson(we: CodeActionWorkspaceEdit): JsonNode =
+  result = newJObject()
+  if we.changes.len > 0:
+    var changesJson = newJObject()
+    for change in we.changes:
+      var editsJson = newJArray()
+      for edit in change.edits:
+        editsJson.add(toTextEditJson(edit))
+      changesJson[change.uri] = editsJson
+    result["changes"] = changesJson
+  if we.documentChanges.len > 0:
+    var documentChangesJson = newJArray()
+    for docChange in we.documentChanges:
+      var docChangeJson = newJObject()
+      var textDocumentJson = newJObject()
+      textDocumentJson["uri"] = %docChange.textDocument.uri
+      if docChange.textDocument.version.isSome:
+        textDocumentJson["version"] = docChange.textDocument.version.get
+      else:
+        textDocumentJson["version"] = newJNull()
+      docChangeJson["textDocument"] = textDocumentJson
+      var editsJson = newJArray()
+      for edit in docChange.edits:
+        editsJson.add(toTextEditJson(edit))
+      docChangeJson["edits"] = editsJson
+      documentChangesJson.add(docChangeJson)
+    result["documentChanges"] = documentChangesJson
+
+proc toCodeActionJson(a: CodeActionContent): JsonNode =
+  result = newJObject()
+  result["title"] = %a.title
+  if a.kind.isSome:
+    result["kind"] = %a.kind.get
+  if a.diagnostics.isSome:
+    result["diagnostics"] = a.diagnostics.get
+  if a.isPreferred.isSome:
+    result["isPreferred"] = %a.isPreferred.get
+  if a.disabled.isSome:
+    result["disabled"] = %*{"reason": a.disabled.get}
+  if a.edit.isSome:
+    result["edit"] = toCodeActionWorkspaceEditJson(a.edit.get)
+  if a.command.isSome:
+    let cmd = a.command.get
+    var cmdJson = newJObject()
+    cmdJson["title"] = %cmd.title
+    cmdJson["command"] = %cmd.command
+    if cmd.arguments.isSome:
+      cmdJson["arguments"] = cmd.arguments.get
+    result["command"] = cmdJson
+  if a.data.isSome:
+    result["data"] = a.data.get
+
+proc handleCodeAction*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.codeAction > 0:
+    await sleepAsync(scenario.delays.codeAction.milliseconds)
+
+  # Check if code action is enabled
+  if not scenario.codeAction.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "codeAction" in scenario.errors:
+    let error = scenario.errors["codeAction"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create code action response from scenario configuration
+    result = newJArray()
+    for actionContent in scenario.codeAction.actions:
+      result.add(toCodeActionJson(actionContent))
   else:
     # Document not found
     return newJNull()
