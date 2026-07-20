@@ -325,6 +325,13 @@ proc handleSemanticTokensRange(
     let response = await server.lspHandler.handleSemanticTokensRange(id, params)
     await server.sendResponse(id, response)
 
+proc handleSemanticTokensDelta(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  server.withCancellationSupport(id, "handleSemanticTokensDelta"):
+    let response = await server.lspHandler.handleSemanticTokensDelta(id, params)
+    await server.sendResponse(id, response)
+
 proc handleInlayHint(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleInlayHint(id, params)
@@ -541,6 +548,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleCompletion(id, params)
   of "textDocument/semanticTokens/full":
     await server.handleSemanticTokensFull(id, params)
+  of "textDocument/semanticTokens/full/delta":
+    await server.handleSemanticTokensDelta(id, params)
   of "textDocument/semanticTokens/range":
     await server.handleSemanticTokensRange(id, params)
   of "textDocument/inlayHint":
