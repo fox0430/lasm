@@ -187,6 +187,24 @@ type
     enabled*: bool
     symbols*: seq[DocumentSymbolContent]
 
+  ParameterInformationContent* = object
+    label*: string
+    documentation*: Option[string]
+
+  SignatureInformationContent* = object
+    label*: string
+    documentation*: Option[string]
+    parameters*: seq[ParameterInformationContent]
+    activeParameter*: Option[int]
+
+  SignatureHelpConfig* = object
+    enabled*: bool
+    signatures*: seq[SignatureInformationContent]
+    activeSignature*: Option[int]
+    activeParameter*: Option[int]
+    triggerCharacters*: seq[string]
+    retriggerCharacters*: seq[string]
+
   DocumentLinkContent* = object
     range*: Range
     target*: Option[string]
@@ -229,6 +247,7 @@ type
     callHierarchyOutgoing*: int
     documentSymbol*: int
     documentLink*: int
+    signatureHelp*: int
     progress*: int
 
   ErrorConfig* = object
@@ -260,6 +279,7 @@ type
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     documentSymbol*: DocumentSymbolConfig
     documentLink*: DocumentLinkConfig
+    signatureHelp*: SignatureHelpConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -323,6 +343,24 @@ proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent
     result.percentage = some(notifNode["percentage"].getInt(0))
   if notifNode.hasKey("cancellable"):
     result.cancellable = some(notifNode["cancellable"].getBool(false))
+
+proc parseParameterInformation(paramNode: JsonNode): ParameterInformationContent =
+  ## Parses a ParameterInformation from a JSON node.
+  result = ParameterInformationContent(label: paramNode["label"].getStr(""))
+  if paramNode.hasKey("documentation"):
+    result.documentation = some(paramNode["documentation"].getStr(""))
+
+proc parseSignatureInformation(sigNode: JsonNode): SignatureInformationContent =
+  ## Parses a SignatureInformation from a JSON node.
+  result =
+    SignatureInformationContent(label: sigNode["label"].getStr(""), parameters: @[])
+  if sigNode.hasKey("documentation"):
+    result.documentation = some(sigNode["documentation"].getStr(""))
+  if sigNode.hasKey("activeParameter"):
+    result.activeParameter = some(sigNode["activeParameter"].getInt(0))
+  if sigNode.contains("parameters"):
+    for paramNode in sigNode["parameters"]:
+      result.parameters.add(parseParameterInformation(paramNode))
 
 proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
   ## Parses a DocumentSymbol from a JSON node.
@@ -1114,6 +1152,38 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default document link config if not specified
           scenario.documentLink = DocumentLinkConfig(enabled: false, links: @[])
 
+        if scenarioData.hasKey("signatureHelp"):
+          # Load signature help configuration
+          let signatureHelpNode = scenarioData["signatureHelp"]
+          var sh = SignatureHelpConfig(
+            enabled: signatureHelpNode["enabled"].getBool(false),
+            signatures: @[],
+            triggerCharacters: @[],
+            retriggerCharacters: @[],
+          )
+          if signatureHelpNode.hasKey("activeSignature"):
+            sh.activeSignature = some(signatureHelpNode["activeSignature"].getInt(0))
+          if signatureHelpNode.hasKey("activeParameter"):
+            sh.activeParameter = some(signatureHelpNode["activeParameter"].getInt(0))
+          if signatureHelpNode.contains("triggerCharacters"):
+            for charNode in signatureHelpNode["triggerCharacters"]:
+              sh.triggerCharacters.add(charNode.getStr(""))
+          if signatureHelpNode.contains("retriggerCharacters"):
+            for charNode in signatureHelpNode["retriggerCharacters"]:
+              sh.retriggerCharacters.add(charNode.getStr(""))
+          if sh.enabled and signatureHelpNode.contains("signatures"):
+            for sigNode in signatureHelpNode["signatures"]:
+              sh.signatures.add(parseSignatureInformation(sigNode))
+          scenario.signatureHelp = sh
+        else:
+          # Default signature help config if not specified
+          scenario.signatureHelp = SignatureHelpConfig(
+            enabled: false,
+            signatures: @[],
+            triggerCharacters: @[],
+            retriggerCharacters: @[],
+          )
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1154,6 +1224,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
+            signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1178,6 +1249,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: 0,
             documentSymbol: 0,
             documentLink: 0,
+            signatureHelp: 0,
             progress: 0,
           )
 
@@ -1228,6 +1300,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     documentSymbol: DocumentSymbolConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
+    signatureHelp: SignatureHelpConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1374,6 +1447,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "callHierarchyOutgoing": 45,
           "documentSymbol": 40,
           "documentLink": 40,
+          "signatureHelp": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -1672,6 +1746,30 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 "end": {"line": 3, "character": 30},
               },
               "target": "file:///path/to/other.nim",
+            },
+          ],
+        },
+        "signatureHelp": {
+          "enabled": true,
+          "triggerCharacters": ["(", ","],
+          "retriggerCharacters": [","],
+          "activeSignature": 0,
+          "activeParameter": 0,
+          "signatures": [
+            {
+              "label": "func println(message: string): void",
+              "documentation": "Prints a message to the console",
+              "activeParameter": 0,
+              "parameters":
+                [{"label": "message: string", "documentation": "The message to print"}],
+            },
+            {
+              "label": "func add(a: int, b: int): int",
+              "documentation": "Adds two integers",
+              "parameters": [
+                {"label": "a: int", "documentation": "The first integer"},
+                {"label": "b: int", "documentation": "The second integer"},
+              ],
             },
           ],
         },
