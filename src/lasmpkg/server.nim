@@ -478,6 +478,13 @@ proc handleSignatureHelp(server: LSPServer, id: JsonNode, params: JsonNode) {.as
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleSelectionRange(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleSelectionRange(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -561,6 +568,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleDocumentLink(id, params)
   of "textDocument/signatureHelp":
     await server.handleSignatureHelp(id, params)
+  of "textDocument/selectionRange":
+    await server.handleSelectionRange(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

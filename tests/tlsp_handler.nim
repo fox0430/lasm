@@ -4443,3 +4443,211 @@ suite "lsp_handler module tests":
     let sigProvider = response["capabilities"]["signatureHelpProvider"]
     check sigProvider["triggerCharacters"].kind == JArray
     check sigProvider["triggerCharacters"].len == 2
+
+  test "handleSelectionRange with disabled selection range":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # selectionRange disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "positions": [{"line": 0, "character": 0}],
+    }
+
+    let response = waitFor handler.handleSelectionRange(%1, params)
+    check response.kind == JNull
+
+  test "handleSelectionRange with enabled selection range":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].selectionRange = SelectionRangeConfig(
+      enabled: true,
+      ranges: @[
+        SelectionRangeContent(
+          range: Range(
+            start: Position(line: 1, character: 10),
+            `end`: Position(line: 1, character: 20),
+          ),
+          parent: some(
+            SelectionRangeContent(
+              range: Range(
+                start: Position(line: 1, character: 0),
+                `end`: Position(line: 1, character: 30),
+              ),
+              parent: some(
+                SelectionRangeContent(
+                  range: Range(
+                    start: Position(line: 0, character: 0),
+                    `end`: Position(line: 4, character: 0),
+                  )
+                )
+              ),
+            )
+          ),
+        )
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "positions": [{"line": 1, "character": 15}],
+    }
+
+    let response = waitFor handler.handleSelectionRange(%1, params)
+    check response.kind == JArray
+    check response.len == 1
+
+    let first = response[0]
+    check first.hasKey("range")
+    check first["range"]["start"]["line"].getInt() == 1
+    check first["range"]["start"]["character"].getInt() == 10
+    check first["range"]["end"]["character"].getInt() == 20
+
+    check first.hasKey("parent")
+    let parent = first["parent"]
+    check parent["range"]["start"]["character"].getInt() == 0
+    check parent["range"]["end"]["character"].getInt() == 30
+
+    check parent.hasKey("parent")
+    let grandparent = parent["parent"]
+    check grandparent["range"]["end"]["line"].getInt() == 4
+    check not grandparent.hasKey("parent")
+
+  test "handleSelectionRange returns one entry per position":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].selectionRange = SelectionRangeConfig(
+      enabled: true,
+      ranges: @[
+        SelectionRangeContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 5),
+          )
+        ),
+        SelectionRangeContent(
+          range: Range(
+            start: Position(line: 2, character: 0),
+            `end`: Position(line: 2, character: 8),
+          )
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "positions": [
+        {"line": 0, "character": 1},
+        {"line": 2, "character": 3},
+        {"line": 5, "character": 0},
+      ],
+    }
+
+    let response = waitFor handler.handleSelectionRange(%1, params)
+    check response.kind == JArray
+    check response.len == 3
+    # First two positions map to their matching configured ranges.
+    check response[0]["range"]["end"]["character"].getInt() == 5
+    check response[1]["range"]["end"]["character"].getInt() == 8
+    # Extra positions reuse the last configured range.
+    check response[2]["range"]["end"]["character"].getInt() == 8
+
+  test "handleSelectionRange with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].selectionRange =
+      SelectionRangeConfig(enabled: true, ranges: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "positions": [{"line": 0, "character": 0}],
+    }
+
+    let response = waitFor handler.handleSelectionRange(%1, params)
+    check response.kind == JNull
+
+  test "handleSelectionRange with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].selectionRange = SelectionRangeConfig(
+      enabled: true,
+      ranges: @[
+        SelectionRangeContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 1),
+          )
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.selectionRange = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "positions": [{"line": 0, "character": 0}],
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleSelectionRange(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleSelectionRange with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].selectionRange =
+      SelectionRangeConfig(enabled: true, ranges: @[])
+    scenarioManager.scenarios["default"].errors["selectionRange"] =
+      ErrorConfig(code: -32603, message: "Selection range failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "positions": [{"line": 0, "character": 0}],
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleSelectionRange(%1, params)
+
+  test "selection range capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("selectionRangeProvider")

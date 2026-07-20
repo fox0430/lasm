@@ -569,6 +569,8 @@ type
   DocumentLinkOptions* = ref object of RootObj
     resolveProvider*: Option[bool]
 
+  SelectionRangeOptions* = ref object of RootObj
+
   ExecuteCommandOptions* = ref object of RootObj
     commands*: OptionalSeq[string]
 
@@ -665,7 +667,8 @@ type
     renameProvider*: JsonNode # bool or RenameOptions
     # foldingRangeProvider?: boolean | FoldingRangeOptions | FoldingRangeRegistrationOptions;
     executeCommandProvider*: Option[ExecuteCommandOptions]
-    # selectionRangeProvider?: boolean | SelectionRangeOptions | SelectionRangeRegistrationOptions;
+    selectionRangeProvider*: Option[SelectionRangeOptions]
+      # boolean | SelectionRangeOptions | SelectionRangeRegistrationOptions
     # linkedEditingRangeProvider?: boolean | LinkedEditingRangeOptions | LinkedEditingRangeRegistrationOptions;
     callHierarchyProvider*: Option[bool]
       # boolean | CallHierarchyOptions | CallHierarchyRegistrationOptions
@@ -897,6 +900,14 @@ type
     `range`*: Range
     selectionRange*: Range
     children*: OptionalSeq[DocumentSymbol]
+
+  SelectionRangeParams* = ref object of RootObj
+    textDocument*: TextDocumentIdentifier
+    positions*: seq[Position]
+
+  SelectionRange* = ref object of RootObj
+    `range`*: Range
+    parent*: Option[SelectionRange]
 
   CodeActionParams* = ref object of RootObj
     textDocument*: TextDocumentIdentifier
