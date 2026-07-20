@@ -86,7 +86,7 @@ proc handleInitialize*(
   let semanticTokensOptions = SemanticTokensOptions()
   semanticTokensOptions.legend = semanticTokensLegend
   semanticTokensOptions.range = some(true)
-  semanticTokensOptions.full = some(%*{"delta": false})
+  semanticTokensOptions.full = some(%*{"delta": true})
 
   serverCapabilities.semanticTokensProvider = some(semanticTokensOptions)
 
@@ -924,6 +924,49 @@ proc handleSemanticTokensRange*(
   # For simplicity, return the same as full semantic tokens
   # In a real implementation, this would filter tokens by range
   return await handler.handleSemanticTokensFull(id, params)
+
+proc toSemanticTokensEditJson(e: SemanticTokensEditContent): JsonNode =
+  result = newJObject()
+  result["start"] = %e.start
+  result["deleteCount"] = %e.deleteCount
+  if e.data.len > 0:
+    result["data"] = %e.data
+
+proc handleSemanticTokensDelta*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.semanticTokensDelta > 0:
+    await sleepAsync(scenario.delays.semanticTokensDelta.milliseconds)
+
+  # Check if semantic tokens delta is enabled
+  if not scenario.semanticTokensDelta.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "semanticTokensDelta" in scenario.errors:
+    let error = scenario.errors["semanticTokensDelta"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  if uri notin handler.documents:
+    return newJNull()
+
+  # Build SemanticTokensDelta response from scenario configuration
+  result = newJObject()
+  if scenario.semanticTokensDelta.resultId.isSome:
+    result["resultId"] = %scenario.semanticTokensDelta.resultId.get
+  else:
+    result["resultId"] = %("delta-" & $handler.documents.len)
+  var edits = newJArray()
+  for edit in scenario.semanticTokensDelta.edits:
+    edits.add(toSemanticTokensEditJson(edit))
+  result["edits"] = edits
 
 proc handleInlayHint*(
     handler: LSPHandler, id: JsonNode, params: JsonNode

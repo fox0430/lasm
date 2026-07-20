@@ -1554,7 +1554,7 @@ suite "lsp_handler module tests":
 
     check semanticTokensProvider["range"].getBool() == true
     check semanticTokensProvider["full"].hasKey("delta")
-    check semanticTokensProvider["full"]["delta"].getBool() == false
+    check semanticTokensProvider["full"]["delta"].getBool() == true
 
   test "handleDidChangeConfiguration with no settings":
     let sm = createTestScenarioManager()
@@ -4801,3 +4801,162 @@ suite "lsp_handler module tests":
 
     check response.hasKey("capabilities")
     check response["capabilities"].hasKey("foldingRangeProvider")
+
+  test "handleSemanticTokensDelta with disabled delta":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # delta disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "previousResultId": "result-1"}
+
+    let response = waitFor handler.handleSemanticTokensDelta(%1, params)
+    check response.kind == JNull
+
+  test "handleSemanticTokensDelta with enabled delta":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].semanticTokensDelta = SemanticTokensDeltaConfig(
+      enabled: true,
+      resultId: some("delta-42"),
+      edits: @[
+        SemanticTokensEditContent(
+          start: uinteger(0),
+          deleteCount: uinteger(5),
+          data: @[uinteger(0), uinteger(0), uinteger(8), uinteger(14), uinteger(1)],
+        ),
+        SemanticTokensEditContent(
+          start: uinteger(10), deleteCount: uinteger(2), data: @[]
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "previousResultId": "result-1"}
+
+    let response = waitFor handler.handleSemanticTokensDelta(%1, params)
+    check response.kind == JObject
+    check response["resultId"].getStr() == "delta-42"
+
+    let edits = response["edits"]
+    check edits.kind == JArray
+    check edits.len == 2
+
+    let first = edits[0]
+    check first["start"].getInt() == 0
+    check first["deleteCount"].getInt() == 5
+    check first["data"].kind == JArray
+    check first["data"].len == 5
+    check first["data"][3].getInt() == 14
+
+    let second = edits[1]
+    check second["start"].getInt() == 10
+    check second["deleteCount"].getInt() == 2
+    check not second.hasKey("data")
+
+  test "handleSemanticTokensDelta generates fallback resultId":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].semanticTokensDelta =
+      SemanticTokensDeltaConfig(enabled: true, edits: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "previousResultId": "result-1"}
+
+    let response = waitFor handler.handleSemanticTokensDelta(%1, params)
+    check response.kind == JObject
+    check response["resultId"].getStr().startsWith("delta-")
+    check response["edits"].kind == JArray
+    check response["edits"].len == 0
+
+  test "handleSemanticTokensDelta with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].semanticTokensDelta = SemanticTokensDeltaConfig(
+      enabled: true,
+      edits: @[
+        SemanticTokensEditContent(
+          start: uinteger(0), deleteCount: uinteger(0), data: @[uinteger(1)]
+        )
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///unknown.nim"}, "previousResultId": "result-1"}
+
+    let response = waitFor handler.handleSemanticTokensDelta(%1, params)
+    check response.kind == JNull
+
+  test "handleSemanticTokensDelta with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].semanticTokensDelta =
+      SemanticTokensDeltaConfig(enabled: true, edits: @[])
+    scenarioManager.scenarios["default"].delays.semanticTokensDelta = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "previousResultId": "result-1"}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleSemanticTokensDelta(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JObject
+
+  test "handleSemanticTokensDelta with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].semanticTokensDelta =
+      SemanticTokensDeltaConfig(enabled: true, edits: @[])
+    scenarioManager.scenarios["default"].errors["semanticTokensDelta"] =
+      ErrorConfig(code: -32603, message: "Semantic tokens delta failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params =
+      %*{"textDocument": {"uri": "file:///test.nim"}, "previousResultId": "result-1"}
+
+    expect(LSPError):
+      discard waitFor handler.handleSemanticTokensDelta(%1, params)
+
+  test "semantic tokens delta capability advertised":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    let provider = response["capabilities"]["semanticTokensProvider"]
+    check provider.hasKey("full")
+    check provider["full"].hasKey("delta")
+    check provider["full"]["delta"].getBool() == true

@@ -47,6 +47,16 @@ type
     enabled*: bool
     tokens*: seq[uinteger]
 
+  SemanticTokensEditContent* = object
+    start*: uinteger
+    deleteCount*: uinteger
+    data*: seq[uinteger]
+
+  SemanticTokensDeltaConfig* = object
+    enabled*: bool
+    resultId*: Option[string]
+    edits*: seq[SemanticTokensEditContent]
+
   InlayHintContent* = object
     position*: Position
     label*: string
@@ -252,6 +262,7 @@ type
     completion*: int
     diagnostics*: int
     semanticTokens*: int
+    semanticTokensDelta*: int
     inlayHint*: int
     declaration*: int
     definition*: int
@@ -286,6 +297,7 @@ type
     completion*: CompletionConfig
     diagnostics*: DiagnosticConfig
     semanticTokens*: SemanticTokensConfig
+    semanticTokensDelta*: SemanticTokensDeltaConfig
     inlayHint*: InlayHintConfig
     declaration*: DeclarationConfig
     definition*: DefinitionConfig
@@ -642,6 +654,31 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
         else:
           # Default semantic tokens config if not specified
           scenario.semanticTokens = SemanticTokensConfig(enabled: false, tokens: @[])
+
+        if scenarioData.hasKey("semanticTokensDelta"):
+          # Load semantic tokens delta configuration
+          let deltaNode = scenarioData["semanticTokensDelta"]
+          var sd = SemanticTokensDeltaConfig(
+            enabled: deltaNode["enabled"].getBool(false), edits: @[]
+          )
+          if deltaNode.hasKey("resultId"):
+            sd.resultId = some(deltaNode["resultId"].getStr(""))
+          if sd.enabled and deltaNode.contains("edits"):
+            for editNode in deltaNode["edits"]:
+              var edit = SemanticTokensEditContent(
+                start: uinteger(editNode{"start"}.getInt(0)),
+                deleteCount: uinteger(editNode{"deleteCount"}.getInt(0)),
+                data: @[],
+              )
+              if editNode.hasKey("data"):
+                for dataNode in editNode["data"]:
+                  edit.data.add(uinteger(dataNode.getInt()))
+              sd.edits.add(edit)
+          scenario.semanticTokensDelta = sd
+        else:
+          # Default semantic tokens delta config if not specified
+          scenario.semanticTokensDelta =
+            SemanticTokensDeltaConfig(enabled: false, edits: @[])
 
         if scenarioData.hasKey("inlayHint"):
           # Load inlay hint configuration
@@ -1285,6 +1322,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             completion: delaysNode{"completion"}.getInt(0),
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
+            semanticTokensDelta: delaysNode{"semanticTokensDelta"}.getInt(0),
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
             declaration: delaysNode{"declaration"}.getInt(0),
             definition: delaysNode{"definition"}.getInt(0),
@@ -1312,6 +1350,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             completion: 0,
             diagnostics: 0,
             semanticTokens: 0,
+            semanticTokensDelta: 0,
             inlayHint: 0,
             declaration: 0,
             definition: 0,
@@ -1365,6 +1404,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     completion: CompletionConfig(enabled: false),
     diagnostics: DiagnosticConfig(enabled: false),
     semanticTokens: SemanticTokensConfig(enabled: false),
+    semanticTokensDelta: SemanticTokensDeltaConfig(enabled: false),
     inlayHint: InlayHintConfig(enabled: false),
     declaration: DeclarationConfig(enabled: false),
     definition: DefinitionConfig(enabled: false),
@@ -1514,6 +1554,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "diagnostics": 200,
           "hover": 50,
           "semanticTokens": 30,
+          "semanticTokensDelta": 30,
           "inlayHint": 25,
           "declaration": 40,
           "definition": 35,
@@ -1537,6 +1578,11 @@ proc createSampleConfig*(sm: ScenarioManager) =
         "semanticTokens": {
           "enabled": true,
           "tokens": [0, 0, 8, 14, 0, 0, 9, 4, 12, 1, 1, 2, 3, 6, 0, 0, 4, 4, 15, 0],
+        },
+        "semanticTokensDelta": {
+          "enabled": true,
+          "resultId": "delta-1",
+          "edits": [{"start": 0, "deleteCount": 5, "data": [0, 0, 8, 14, 1]}],
         },
         "declaration": {
           "enabled": true,
@@ -1923,6 +1969,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
         "completion": {"enabled": false},
         "diagnostics": {"enabled": false},
         "semanticTokens": {"enabled": false},
+        "semanticTokensDelta": {"enabled": false},
         "inlayHint": {"enabled": false},
         "declaration": {
           "enabled": true,
