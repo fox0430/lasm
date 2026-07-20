@@ -214,6 +214,14 @@ type
     enabled*: bool
     links*: seq[DocumentLinkContent]
 
+  SelectionRangeContent* = ref object
+    range*: Range
+    parent*: Option[SelectionRangeContent]
+
+  SelectionRangeConfig* = object
+    enabled*: bool
+    ranges*: seq[SelectionRangeContent]
+
   ProgressNotificationContent* = object
     kind*: string # "begin" | "report" | "end"
     title*: Option[string]
@@ -248,6 +256,7 @@ type
     documentSymbol*: int
     documentLink*: int
     signatureHelp*: int
+    selectionRange*: int
     progress*: int
 
   ErrorConfig* = object
@@ -280,6 +289,7 @@ type
     documentSymbol*: DocumentSymbolConfig
     documentLink*: DocumentLinkConfig
     signatureHelp*: SignatureHelpConfig
+    selectionRange*: SelectionRangeConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -329,6 +339,14 @@ proc parseDocumentLink(linkNode: JsonNode): DocumentLinkContent =
     result.target = some(linkNode["target"].getStr(""))
   if linkNode.hasKey("tooltip"):
     result.tooltip = some(linkNode["tooltip"].getStr(""))
+
+proc parseSelectionRange(rangeNode: JsonNode): SelectionRangeContent =
+  ## Parses a SelectionRange from a JSON node. The optional `parent`
+  ## field is another SelectionRange, forming a chain from innermost
+  ## to outermost.
+  result = SelectionRangeContent(range: parseRange(rangeNode["range"]))
+  if rangeNode.hasKey("parent") and rangeNode["parent"].kind == JObject:
+    result.parent = some(parseSelectionRange(rangeNode["parent"]))
 
 proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent =
   ## Parses a progress notification entry from a JSON node.
@@ -1184,6 +1202,20 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             retriggerCharacters: @[],
           )
 
+        if scenarioData.hasKey("selectionRange"):
+          # Load selection range configuration
+          let selectionRangeNode = scenarioData["selectionRange"]
+          var sr = SelectionRangeConfig(
+            enabled: selectionRangeNode["enabled"].getBool(false), ranges: @[]
+          )
+          if sr.enabled and selectionRangeNode.contains("ranges"):
+            for rangeNode in selectionRangeNode["ranges"]:
+              sr.ranges.add(parseSelectionRange(rangeNode))
+          scenario.selectionRange = sr
+        else:
+          # Default selection range config if not specified
+          scenario.selectionRange = SelectionRangeConfig(enabled: false, ranges: @[])
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1225,6 +1257,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
+            selectionRange: delaysNode{"selectionRange"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1250,6 +1283,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentSymbol: 0,
             documentLink: 0,
             signatureHelp: 0,
+            selectionRange: 0,
             progress: 0,
           )
 
@@ -1301,6 +1335,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     documentSymbol: DocumentSymbolConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
     signatureHelp: SignatureHelpConfig(enabled: false),
+    selectionRange: SelectionRangeConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1448,6 +1483,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "documentSymbol": 40,
           "documentLink": 40,
           "signatureHelp": 30,
+          "selectionRange": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -1771,6 +1807,29 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 {"label": "b: int", "documentation": "The second integer"},
               ],
             },
+          ],
+        },
+        "selectionRange": {
+          "enabled": true,
+          "ranges": [
+            {
+              "range": {
+                "start": {"line": 1, "character": 10},
+                "end": {"line": 1, "character": 20},
+              },
+              "parent": {
+                "range": {
+                  "start": {"line": 1, "character": 0},
+                  "end": {"line": 1, "character": 30},
+                },
+                "parent": {
+                  "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 4, "character": 0},
+                  }
+                },
+              },
+            }
           ],
         },
         "progress": {

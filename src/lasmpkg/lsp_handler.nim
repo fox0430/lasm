@@ -131,6 +131,9 @@ proc handleInitialize*(
   let documentLinkOptions = DocumentLinkOptions(resolveProvider: some(false))
   serverCapabilities.documentLinkProvider = some(documentLinkOptions)
 
+  # Set selection range provider
+  serverCapabilities.selectionRangeProvider = some(SelectionRangeOptions())
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1649,6 +1652,57 @@ proc handleSignatureHelp*(
       result["activeSignature"] = %scenario.signatureHelp.activeSignature.get
     if scenario.signatureHelp.activeParameter.isSome:
       result["activeParameter"] = %scenario.signatureHelp.activeParameter.get
+  else:
+    # Document not found
+    return newJNull()
+
+proc toSelectionRangeJson(c: SelectionRangeContent): JsonNode =
+  result = newJObject()
+  result["range"] = %c.range
+  if c.parent.isSome:
+    result["parent"] = toSelectionRangeJson(c.parent.get)
+
+proc handleSelectionRange*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.selectionRange > 0:
+    await sleepAsync(scenario.delays.selectionRange.milliseconds)
+
+  # Check if selection range is enabled
+  if not scenario.selectionRange.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "selectionRange" in scenario.errors:
+    let error = scenario.errors["selectionRange"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # LSP returns one SelectionRange per input position. Fall back to a
+    # single-element position array when the client sends none so the
+    # response is still well-formed.
+    let positionsLen =
+      if params.hasKey("positions") and params["positions"].kind == JArray:
+        max(params["positions"].len, 1)
+      else:
+        1
+
+    let configuredRanges = scenario.selectionRange.ranges
+    result = newJArray()
+    for i in 0 ..< positionsLen:
+      if configuredRanges.len == 0:
+        result.add(newJNull())
+      else:
+        let content = configuredRanges[min(i, configuredRanges.len - 1)]
+        result.add(toSelectionRangeJson(content))
   else:
     # Document not found
     return newJNull()
