@@ -65,6 +65,7 @@ See `lsp-test-config-sample.json` for examples.
 | callHierarchy/outgoingCalls | |
 | textDocument/documentSymbol | |
 | textDocument/documentLink | |
+| $/progress | Server-sent notification; trigger via `lsptest.sendProgress` |
 | textDocument/shutdown | |
 
 ## Commands
@@ -76,3 +77,4 @@ LASM provides several commands that can be executed through the LSP client:
 - `lsptest.reloadConfig` - Reload configuration file
 - `lsptest.createSampleConfig` - Create a sample configuration file
 - `lsptest.listOpenFiles` - List all currently open files with details
+- `lsptest.sendProgress` - Send the scenario's configured `$/progress` notifications

@@ -5,9 +5,14 @@ import pkg/chronos
 import scenario, logger
 import protocol/types
 
-type LSPHandler* = ref object
-  documents*: Table[string, Document]
-  scenarioManager*: ScenarioManager
+type
+  SendNotificationProc* =
+    proc(methodName: string, params: JsonNode): Future[void] {.async.}
+
+  LSPHandler* = ref object
+    documents*: Table[string, Document]
+    scenarioManager*: ScenarioManager
+    sendNotification*: SendNotificationProc
 
 proc newLSPHandler*(scenarioManager: ScenarioManager): LSPHandler =
   result = LSPHandler()
@@ -50,7 +55,7 @@ proc handleInitialize*(
   executeCommandOptions.commands = some(
     @[
       "lsptest.switchScenario", "lsptest.listScenarios", "lsptest.reloadConfig",
-      "lsptest.createSampleConfig", "lsptest.listOpenFiles",
+      "lsptest.createSampleConfig", "lsptest.listOpenFiles", "lsptest.sendProgress",
     ]
   )
   serverCapabilities.executeCommandProvider = some(executeCommandOptions)
@@ -128,6 +133,48 @@ proc handleInitialize*(
     %*{"interFileDependencies": false, "workspaceDiagnostics": false}
   result["capabilities"] = capabilitiesJson
   result["serverInfo"] = %*{"name": "LSP Test Server", "version": "0.1.0"}
+
+proc toProgressValueJson(c: ProgressNotificationContent): JsonNode =
+  ## Builds the WorkDoneProgress{Begin,Report,End} value payload for a
+  ## configured progress notification entry.
+  result = newJObject()
+  result["kind"] = %c.kind
+  if c.kind == "begin":
+    result["title"] = %(if c.title.isSome: c.title.get else: "")
+  if c.cancellable.isSome and c.kind != "end":
+    result["cancellable"] = %c.cancellable.get
+  if c.message.isSome:
+    result["message"] = %c.message.get
+  if c.percentage.isSome and c.kind != "end":
+    result["percentage"] = %c.percentage.get
+
+proc sendProgress*(handler: LSPHandler): Future[void] {.async.} =
+  ## Sends the configured `$/progress` notifications for the current
+  ## scenario, honoring per-notification delays.
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply base delay if configured
+  if scenario.delays.progress > 0:
+    await sleepAsync(scenario.delays.progress.milliseconds)
+
+  if not scenario.progress.enabled:
+    return
+
+  # Check for error injection
+  if "progress" in scenario.errors:
+    let error = scenario.errors["progress"]
+    raise newException(LSPError, error.message)
+
+  if handler.sendNotification == nil:
+    logWarn("sendProgress called but no sendNotification callback is set")
+    return
+
+  let token = scenario.progress.token
+  for notif in scenario.progress.notifications:
+    if notif.delay > 0:
+      await sleepAsync(notif.delay.milliseconds)
+    let params = %*{"token": token, "value": toProgressValueJson(notif)}
+    await handler.sendNotification("$/progress", params)
 
 proc handleExecuteCommand*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
@@ -227,6 +274,13 @@ proc handleExecuteCommand*(
     notifications.add(
       %*{"method": "window/showMessage", "params": {"type": 3, "message": message}}
     )
+    return (response, notifications)
+  of "lsptest.sendProgress":
+    let scenario = handler.scenarioManager.getCurrentScenario()
+    if not scenario.progress.enabled:
+      raise newException(LSPError, "Progress is not enabled in current scenario")
+    await handler.sendProgress()
+    let response = %*{"success": true, "token": scenario.progress.token}
     return (response, notifications)
   else:
     raise newException(LSPError, "Unknown command: " & command)
