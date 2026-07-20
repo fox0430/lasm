@@ -137,6 +137,9 @@ proc handleInitialize*(
   # Set folding range provider
   serverCapabilities.foldingRangeProvider = some(FoldingRangeOptions())
 
+  # Set code lens provider
+  serverCapabilities.codeLensProvider = CodeLensOptions(resolveProvider: some(false))
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1794,6 +1797,52 @@ proc handleFoldingRange*(
     result = newJArray()
     for rangeContent in scenario.foldingRange.ranges:
       result.add(toFoldingRangeJson(rangeContent))
+  else:
+    # Document not found
+    return newJNull()
+
+proc toCodeLensJson(c: CodeLensContent): JsonNode =
+  result = newJObject()
+  result["range"] = %c.range
+  if c.command.isSome:
+    let cmd = c.command.get
+    var cmdJson = newJObject()
+    cmdJson["title"] = %cmd.title
+    cmdJson["command"] = %cmd.command
+    if cmd.arguments.isSome:
+      cmdJson["arguments"] = cmd.arguments.get
+    result["command"] = cmdJson
+  if c.data.isSome:
+    result["data"] = c.data.get
+
+proc handleCodeLens*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.codeLens > 0:
+    await sleepAsync(scenario.delays.codeLens.milliseconds)
+
+  # Check if code lens is enabled
+  if not scenario.codeLens.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "codeLens" in scenario.errors:
+    let error = scenario.errors["codeLens"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create code lens response from scenario configuration
+    result = newJArray()
+    for lensContent in scenario.codeLens.lenses:
+      result.add(toCodeLensJson(lensContent))
   else:
     # Document not found
     return newJNull()

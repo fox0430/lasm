@@ -244,6 +244,20 @@ type
     enabled*: bool
     ranges*: seq[FoldingRangeContent]
 
+  CodeLensCommandContent* = object
+    title*: string
+    command*: string
+    arguments*: Option[JsonNode]
+
+  CodeLensContent* = object
+    range*: Range
+    command*: Option[CodeLensCommandContent]
+    data*: Option[JsonNode]
+
+  CodeLensConfig* = object
+    enabled*: bool
+    lenses*: seq[CodeLensContent]
+
   ProgressNotificationContent* = object
     kind*: string # "begin" | "report" | "end"
     title*: Option[string]
@@ -281,6 +295,7 @@ type
     signatureHelp*: int
     selectionRange*: int
     foldingRange*: int
+    codeLens*: int
     progress*: int
 
   ErrorConfig* = object
@@ -316,6 +331,7 @@ type
     signatureHelp*: SignatureHelpConfig
     selectionRange*: SelectionRangeConfig
     foldingRange*: FoldingRangeConfig
+    codeLens*: CodeLensConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -389,6 +405,21 @@ proc parseFoldingRange(rangeNode: JsonNode): FoldingRangeContent =
     result.kind = some(rangeNode["kind"].getStr(""))
   if rangeNode.hasKey("collapsedText"):
     result.collapsedText = some(rangeNode["collapsedText"].getStr(""))
+
+proc parseCodeLens(lensNode: JsonNode): CodeLensContent =
+  ## Parses a CodeLens from a JSON node. The `range` field is required;
+  ## `command` and `data` are optional per the LSP spec.
+  result = CodeLensContent(range: parseRange(lensNode["range"]))
+  if lensNode.hasKey("command") and lensNode["command"].kind == JObject:
+    let cmdNode = lensNode["command"]
+    var cmd = CodeLensCommandContent(
+      title: cmdNode{"title"}.getStr(""), command: cmdNode{"command"}.getStr("")
+    )
+    if cmdNode.hasKey("arguments"):
+      cmd.arguments = some(cmdNode["arguments"])
+    result.command = some(cmd)
+  if lensNode.hasKey("data"):
+    result.data = some(lensNode["data"])
 
 proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent =
   ## Parses a progress notification entry from a JSON node.
@@ -1297,6 +1328,19 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default folding range config if not specified
           scenario.foldingRange = FoldingRangeConfig(enabled: false, ranges: @[])
 
+        if scenarioData.hasKey("codeLens"):
+          # Load code lens configuration
+          let codeLensNode = scenarioData["codeLens"]
+          var cl =
+            CodeLensConfig(enabled: codeLensNode["enabled"].getBool(false), lenses: @[])
+          if cl.enabled and codeLensNode.contains("lenses"):
+            for lensNode in codeLensNode["lenses"]:
+              cl.lenses.add(parseCodeLens(lensNode))
+          scenario.codeLens = cl
+        else:
+          # Default code lens config if not specified
+          scenario.codeLens = CodeLensConfig(enabled: false, lenses: @[])
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1341,6 +1385,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
             foldingRange: delaysNode{"foldingRange"}.getInt(0),
+            codeLens: delaysNode{"codeLens"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1369,6 +1414,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             signatureHelp: 0,
             selectionRange: 0,
             foldingRange: 0,
+            codeLens: 0,
             progress: 0,
           )
 
@@ -1423,6 +1469,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     signatureHelp: SignatureHelpConfig(enabled: false),
     selectionRange: SelectionRangeConfig(enabled: false),
     foldingRange: FoldingRangeConfig(enabled: false),
+    codeLens: CodeLensConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1573,6 +1620,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "signatureHelp": 30,
           "selectionRange": 30,
           "foldingRange": 30,
+          "codeLens": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -1939,6 +1987,30 @@ proc createSampleConfig*(sm: ScenarioManager) =
             },
             {"startLine": 2, "endLine": 4, "kind": "comment"},
             {"startLine": 12, "endLine": 15, "kind": "imports"},
+          ],
+        },
+        "codeLens": {
+          "enabled": true,
+          "lenses": [
+            {
+              "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": 0, "character": 10},
+              },
+              "command": {
+                "title": "3 references",
+                "command": "editor.action.showReferences",
+                "arguments": ["file:///path/to/test.nim", {"line": 0, "character": 0}],
+              },
+            },
+            {
+              "range": {
+                "start": {"line": 5, "character": 0},
+                "end": {"line": 5, "character": 15},
+              },
+              "command": {"title": "Run test", "command": "lasm.runTest"},
+              "data": {"testId": "sample-1"},
+            },
           ],
         },
         "progress": {

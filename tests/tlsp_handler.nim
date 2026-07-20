@@ -4960,3 +4960,183 @@ suite "lsp_handler module tests":
     check provider.hasKey("full")
     check provider["full"].hasKey("delta")
     check provider["full"]["delta"].getBool() == true
+
+  test "handleCodeLens with disabled code lens":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # codeLens disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleCodeLens(%1, params)
+    check response.kind == JNull
+
+  test "handleCodeLens with enabled code lens":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeLens = CodeLensConfig(
+      enabled: true,
+      lenses: @[
+        CodeLensContent(
+          range: Range(
+            start: Position(line: uinteger(0), character: uinteger(0)),
+            `end`: Position(line: uinteger(0), character: uinteger(10)),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "3 references",
+              command: "editor.action.showReferences",
+              arguments: some(%*["file:///test.nim", {"line": 0, "character": 0}]),
+            )
+          ),
+        ),
+        CodeLensContent(
+          range: Range(
+            start: Position(line: uinteger(5), character: uinteger(0)),
+            `end`: Position(line: uinteger(5), character: uinteger(15)),
+          ),
+          command:
+            some(CodeLensCommandContent(title: "Run test", command: "lasm.runTest")),
+          data: some(%*{"testId": "sample-1"}),
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleCodeLens(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let first = response[0]
+    check first["range"]["start"]["line"].getInt() == 0
+    check first["range"]["start"]["character"].getInt() == 0
+    check first["range"]["end"]["line"].getInt() == 0
+    check first["range"]["end"]["character"].getInt() == 10
+    check first["command"]["title"].getStr() == "3 references"
+    check first["command"]["command"].getStr() == "editor.action.showReferences"
+    check first["command"]["arguments"].kind == JArray
+    check first["command"]["arguments"].len == 2
+    check not first.hasKey("data")
+
+    let second = response[1]
+    check second["range"]["start"]["line"].getInt() == 5
+    check second["command"]["title"].getStr() == "Run test"
+    check second["command"]["command"].getStr() == "lasm.runTest"
+    check not second["command"].hasKey("arguments")
+    check second["data"]["testId"].getStr() == "sample-1"
+
+  test "handleCodeLens with empty lenses returns empty array":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeLens =
+      CodeLensConfig(enabled: true, lenses: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleCodeLens(%1, params)
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleCodeLens with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeLens = CodeLensConfig(
+      enabled: true,
+      lenses: @[
+        CodeLensContent(
+          range: Range(
+            start: Position(line: uinteger(0), character: uinteger(0)),
+            `end`: Position(line: uinteger(0), character: uinteger(1)),
+          )
+        )
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"textDocument": {"uri": "file:///unknown.nim"}}
+
+    let response = waitFor handler.handleCodeLens(%1, params)
+    check response.kind == JNull
+
+  test "handleCodeLens with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeLens = CodeLensConfig(
+      enabled: true,
+      lenses: @[
+        CodeLensContent(
+          range: Range(
+            start: Position(line: uinteger(0), character: uinteger(0)),
+            `end`: Position(line: uinteger(0), character: uinteger(1)),
+          )
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.codeLens = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCodeLens(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleCodeLens with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeLens =
+      CodeLensConfig(enabled: true, lenses: @[])
+    scenarioManager.scenarios["default"].errors["codeLens"] =
+      ErrorConfig(code: -32603, message: "Code lens failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    expect(LSPError):
+      discard waitFor handler.handleCodeLens(%1, params)
+
+  test "code lens capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeLensProvider")
+    check response["capabilities"]["codeLensProvider"].hasKey("resolveProvider")
+    check response["capabilities"]["codeLensProvider"]["resolveProvider"].getBool() ==
+      false
