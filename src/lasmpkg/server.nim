@@ -485,6 +485,13 @@ proc handleSelectionRange(server: LSPServer, id: JsonNode, params: JsonNode) {.a
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleFoldingRange(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleFoldingRange(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -570,6 +577,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleSignatureHelp(id, params)
   of "textDocument/selectionRange":
     await server.handleSelectionRange(id, params)
+  of "textDocument/foldingRange":
+    await server.handleFoldingRange(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

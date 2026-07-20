@@ -571,6 +571,8 @@ type
 
   SelectionRangeOptions* = ref object of RootObj
 
+  FoldingRangeOptions* = ref object of RootObj
+
   ExecuteCommandOptions* = ref object of RootObj
     commands*: OptionalSeq[string]
 
@@ -665,7 +667,8 @@ type
     documentRangeFormattingProvider*: Option[bool]
     documentOnTypeFormattingProvider*: DocumentOnTypeFormattingOptions
     renameProvider*: JsonNode # bool or RenameOptions
-    # foldingRangeProvider?: boolean | FoldingRangeOptions | FoldingRangeRegistrationOptions;
+    foldingRangeProvider*: Option[FoldingRangeOptions]
+      # boolean | FoldingRangeOptions | FoldingRangeRegistrationOptions
     executeCommandProvider*: Option[ExecuteCommandOptions]
     selectionRangeProvider*: Option[SelectionRangeOptions]
       # boolean | SelectionRangeOptions | SelectionRangeRegistrationOptions
@@ -908,6 +911,17 @@ type
   SelectionRange* = ref object of RootObj
     `range`*: Range
     parent*: Option[SelectionRange]
+
+  FoldingRangeParams* = ref object of RootObj
+    textDocument*: TextDocumentIdentifier
+
+  FoldingRange* = ref object of RootObj
+    startLine*: uinteger
+    startCharacter*: Option[uinteger]
+    endLine*: uinteger
+    endCharacter*: Option[uinteger]
+    kind*: Option[string] # 'comment' | 'imports' | 'region'
+    collapsedText*: Option[string]
 
   CodeActionParams* = ref object of RootObj
     textDocument*: TextDocumentIdentifier
