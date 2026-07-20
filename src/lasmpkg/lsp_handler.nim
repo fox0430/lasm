@@ -134,6 +134,9 @@ proc handleInitialize*(
   # Set selection range provider
   serverCapabilities.selectionRangeProvider = some(SelectionRangeOptions())
 
+  # Set folding range provider
+  serverCapabilities.foldingRangeProvider = some(FoldingRangeOptions())
+
   # Create the InitializeResult
   let initResult = InitializeResult()
   initResult.capabilities = serverCapabilities
@@ -1703,6 +1706,51 @@ proc handleSelectionRange*(
       else:
         let content = configuredRanges[min(i, configuredRanges.len - 1)]
         result.add(toSelectionRangeJson(content))
+  else:
+    # Document not found
+    return newJNull()
+
+proc toFoldingRangeJson(c: FoldingRangeContent): JsonNode =
+  result = newJObject()
+  result["startLine"] = %c.startLine
+  result["endLine"] = %c.endLine
+  if c.startCharacter.isSome:
+    result["startCharacter"] = %c.startCharacter.get
+  if c.endCharacter.isSome:
+    result["endCharacter"] = %c.endCharacter.get
+  if c.kind.isSome:
+    result["kind"] = %c.kind.get
+  if c.collapsedText.isSome:
+    result["collapsedText"] = %c.collapsedText.get
+
+proc handleFoldingRange*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.foldingRange > 0:
+    await sleepAsync(scenario.delays.foldingRange.milliseconds)
+
+  # Check if folding range is enabled
+  if not scenario.foldingRange.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "foldingRange" in scenario.errors:
+    let error = scenario.errors["foldingRange"]
+    raise newException(LSPError, error.message)
+
+  # Extract document information
+  let textDocument = params["textDocument"]
+  let uri = textDocument["uri"].getStr()
+
+  # Get document content if available
+  if uri in handler.documents:
+    # Create folding ranges response from scenario configuration
+    result = newJArray()
+    for rangeContent in scenario.foldingRange.ranges:
+      result.add(toFoldingRangeJson(rangeContent))
   else:
     # Document not found
     return newJNull()

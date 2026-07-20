@@ -222,6 +222,18 @@ type
     enabled*: bool
     ranges*: seq[SelectionRangeContent]
 
+  FoldingRangeContent* = object
+    startLine*: uinteger
+    startCharacter*: Option[uinteger]
+    endLine*: uinteger
+    endCharacter*: Option[uinteger]
+    kind*: Option[string] # 'comment' | 'imports' | 'region'
+    collapsedText*: Option[string]
+
+  FoldingRangeConfig* = object
+    enabled*: bool
+    ranges*: seq[FoldingRangeContent]
+
   ProgressNotificationContent* = object
     kind*: string # "begin" | "report" | "end"
     title*: Option[string]
@@ -257,6 +269,7 @@ type
     documentLink*: int
     signatureHelp*: int
     selectionRange*: int
+    foldingRange*: int
     progress*: int
 
   ErrorConfig* = object
@@ -290,6 +303,7 @@ type
     documentLink*: DocumentLinkConfig
     signatureHelp*: SignatureHelpConfig
     selectionRange*: SelectionRangeConfig
+    foldingRange*: FoldingRangeConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -347,6 +361,22 @@ proc parseSelectionRange(rangeNode: JsonNode): SelectionRangeContent =
   result = SelectionRangeContent(range: parseRange(rangeNode["range"]))
   if rangeNode.hasKey("parent") and rangeNode["parent"].kind == JObject:
     result.parent = some(parseSelectionRange(rangeNode["parent"]))
+
+proc parseFoldingRange(rangeNode: JsonNode): FoldingRangeContent =
+  ## Parses a FoldingRange from a JSON node. `startLine` and `endLine`
+  ## are required; other fields are optional per the LSP spec.
+  result = FoldingRangeContent(
+    startLine: uinteger(rangeNode{"startLine"}.getInt(0)),
+    endLine: uinteger(rangeNode{"endLine"}.getInt(0)),
+  )
+  if rangeNode.hasKey("startCharacter"):
+    result.startCharacter = some(uinteger(rangeNode["startCharacter"].getInt(0)))
+  if rangeNode.hasKey("endCharacter"):
+    result.endCharacter = some(uinteger(rangeNode["endCharacter"].getInt(0)))
+  if rangeNode.hasKey("kind"):
+    result.kind = some(rangeNode["kind"].getStr(""))
+  if rangeNode.hasKey("collapsedText"):
+    result.collapsedText = some(rangeNode["collapsedText"].getStr(""))
 
 proc parseProgressNotification(notifNode: JsonNode): ProgressNotificationContent =
   ## Parses a progress notification entry from a JSON node.
@@ -1216,6 +1246,20 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default selection range config if not specified
           scenario.selectionRange = SelectionRangeConfig(enabled: false, ranges: @[])
 
+        if scenarioData.hasKey("foldingRange"):
+          # Load folding range configuration
+          let foldingRangeNode = scenarioData["foldingRange"]
+          var fr = FoldingRangeConfig(
+            enabled: foldingRangeNode["enabled"].getBool(false), ranges: @[]
+          )
+          if fr.enabled and foldingRangeNode.contains("ranges"):
+            for rangeNode in foldingRangeNode["ranges"]:
+              fr.ranges.add(parseFoldingRange(rangeNode))
+          scenario.foldingRange = fr
+        else:
+          # Default folding range config if not specified
+          scenario.foldingRange = FoldingRangeConfig(enabled: false, ranges: @[])
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1258,6 +1302,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentLink: delaysNode{"documentLink"}.getInt(0),
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
+            foldingRange: delaysNode{"foldingRange"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1284,6 +1329,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentLink: 0,
             signatureHelp: 0,
             selectionRange: 0,
+            foldingRange: 0,
             progress: 0,
           )
 
@@ -1336,6 +1382,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     documentLink: DocumentLinkConfig(enabled: false),
     signatureHelp: SignatureHelpConfig(enabled: false),
     selectionRange: SelectionRangeConfig(enabled: false),
+    foldingRange: FoldingRangeConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1484,6 +1531,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "documentLink": 40,
           "signatureHelp": 30,
           "selectionRange": 30,
+          "foldingRange": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -1830,6 +1878,21 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 },
               },
             }
+          ],
+        },
+        "foldingRange": {
+          "enabled": true,
+          "ranges": [
+            {
+              "startLine": 0,
+              "startCharacter": 0,
+              "endLine": 10,
+              "endCharacter": 1,
+              "kind": "region",
+              "collapsedText": "...",
+            },
+            {"startLine": 2, "endLine": 4, "kind": "comment"},
+            {"startLine": 12, "endLine": 15, "kind": "imports"},
           ],
         },
         "progress": {

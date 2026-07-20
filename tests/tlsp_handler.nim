@@ -4651,3 +4651,153 @@ suite "lsp_handler module tests":
 
     check response.hasKey("capabilities")
     check response["capabilities"].hasKey("selectionRangeProvider")
+
+  test "handleFoldingRange with disabled folding range":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # foldingRange disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleFoldingRange(%1, params)
+    check response.kind == JNull
+
+  test "handleFoldingRange with enabled folding range":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].foldingRange = FoldingRangeConfig(
+      enabled: true,
+      ranges: @[
+        FoldingRangeContent(
+          startLine: uinteger(0),
+          startCharacter: some(uinteger(0)),
+          endLine: uinteger(10),
+          endCharacter: some(uinteger(1)),
+          kind: some("region"),
+          collapsedText: some("..."),
+        ),
+        FoldingRangeContent(
+          startLine: uinteger(2), endLine: uinteger(4), kind: some("comment")
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleFoldingRange(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let first = response[0]
+    check first["startLine"].getInt() == 0
+    check first["endLine"].getInt() == 10
+    check first["startCharacter"].getInt() == 0
+    check first["endCharacter"].getInt() == 1
+    check first["kind"].getStr() == "region"
+    check first["collapsedText"].getStr() == "..."
+
+    let second = response[1]
+    check second["startLine"].getInt() == 2
+    check second["endLine"].getInt() == 4
+    check second["kind"].getStr() == "comment"
+    check not second.hasKey("startCharacter")
+    check not second.hasKey("endCharacter")
+    check not second.hasKey("collapsedText")
+
+  test "handleFoldingRange with empty ranges returns empty array":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].foldingRange =
+      FoldingRangeConfig(enabled: true, ranges: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let response = waitFor handler.handleFoldingRange(%1, params)
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleFoldingRange with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].foldingRange = FoldingRangeConfig(
+      enabled: true,
+      ranges: @[FoldingRangeContent(startLine: uinteger(0), endLine: uinteger(1))],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"textDocument": {"uri": "file:///unknown.nim"}}
+
+    let response = waitFor handler.handleFoldingRange(%1, params)
+    check response.kind == JNull
+
+  test "handleFoldingRange with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].foldingRange = FoldingRangeConfig(
+      enabled: true,
+      ranges: @[FoldingRangeContent(startLine: uinteger(0), endLine: uinteger(1))],
+    )
+    scenarioManager.scenarios["default"].delays.foldingRange = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleFoldingRange(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleFoldingRange with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].foldingRange =
+      FoldingRangeConfig(enabled: true, ranges: @[])
+    scenarioManager.scenarios["default"].errors["foldingRange"] =
+      ErrorConfig(code: -32603, message: "Folding range failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+
+    expect(LSPError):
+      discard waitFor handler.handleFoldingRange(%1, params)
+
+  test "folding range capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("foldingRangeProvider")

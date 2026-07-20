@@ -67,6 +67,7 @@ See `lsp-test-config-sample.json` for examples.
 | textDocument/documentLink | |
 | textDocument/signatureHelp | |
 | textDocument/selectionRange | |
+| textDocument/foldingRange | |
 | $/progress | Server-sent notification; trigger via `lsptest.sendProgress` |
 | textDocument/shutdown | |
 
