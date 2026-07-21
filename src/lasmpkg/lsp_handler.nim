@@ -113,7 +113,10 @@ proc handleInitialize*(
   serverCapabilities.documentHighlightProvider = some(true)
 
   # Set rename provider
-  serverCapabilities.renameProvider = %true
+  if currentScenario.prepareRename.enabled:
+    serverCapabilities.renameProvider = %*{"prepareProvider": true}
+  else:
+    serverCapabilities.renameProvider = %true
 
   # Set document formatting provider
   serverCapabilities.documentFormattingProvider = some(true)
@@ -1489,6 +1492,45 @@ proc handleTextDocumentRename*(
   else:
     # Document not found
     return newJNull()
+
+proc handleTextDocumentPrepareRename*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.prepareRename > 0:
+    await sleepAsync(scenario.delays.prepareRename.milliseconds)
+
+  # Check if prepareRename is enabled
+  if not scenario.prepareRename.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "prepareRename" in scenario.errors:
+    let error = scenario.errors["prepareRename"]
+    raise newException(LSPError, error.message)
+
+  # Require an open document, otherwise there is nothing to rename
+  let uri = params["textDocument"]["uri"].getStr()
+  if uri notin handler.documents:
+    return newJNull()
+
+  # Response variants (in priority order):
+  #   { "defaultBehavior": bool }
+  #   { "range": Range, "placeholder": string }
+  #   Range
+  #   null
+  if scenario.prepareRename.defaultBehavior.isSome:
+    return %*{"defaultBehavior": scenario.prepareRename.defaultBehavior.get}
+
+  if scenario.prepareRename.range.isSome:
+    let range = scenario.prepareRename.range.get
+    if scenario.prepareRename.placeholder.isSome:
+      return %*{"range": range, "placeholder": scenario.prepareRename.placeholder.get}
+    return %range
+
+  return newJNull()
 
 proc handleDocumentFormatting*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
