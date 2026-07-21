@@ -505,6 +505,15 @@ proc handleDocumentLink(server: LSPServer, id: JsonNode, params: JsonNode) {.asy
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleDocumentLinkResolve(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleDocumentLinkResolve(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleSignatureHelp(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleSignatureHelp(id, params)
@@ -647,6 +656,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleWorkspaceSymbol(id, params)
   of "textDocument/documentLink":
     await server.handleDocumentLink(id, params)
+  of "documentLink/resolve":
+    await server.handleDocumentLinkResolve(id, params)
   of "textDocument/signatureHelp":
     await server.handleSignatureHelp(id, params)
   of "textDocument/selectionRange":
