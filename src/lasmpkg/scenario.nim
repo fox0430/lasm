@@ -235,10 +235,25 @@ type
     uri*: string
     range*: Range
     containerName*: Option[string]
+    data*: Option[JsonNode]
 
   WorkspaceSymbolConfig* = object
     enabled*: bool
     symbols*: seq[WorkspaceSymbolContent]
+
+  WorkspaceSymbolResolveContent* = object
+    name*: string
+    kind*: Option[int] # SymbolKind
+    tags*: seq[int] # SymbolTag
+    deprecated*: Option[bool]
+    uri*: Option[string]
+    range*: Option[Range]
+    containerName*: Option[string]
+    data*: Option[JsonNode]
+
+  WorkspaceSymbolResolveConfig* = object
+    enabled*: bool
+    items*: seq[WorkspaceSymbolResolveContent]
 
   ParameterInformationContent* = object
     label*: string
@@ -398,6 +413,7 @@ type
     callHierarchyOutgoing*: int
     documentSymbol*: int
     workspaceSymbol*: int
+    workspaceSymbolResolve*: int
     documentLink*: int
     documentLinkResolve*: int
     signatureHelp*: int
@@ -442,6 +458,7 @@ type
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     documentSymbol*: DocumentSymbolConfig
     workspaceSymbol*: WorkspaceSymbolConfig
+    workspaceSymbolResolve*: WorkspaceSymbolResolveConfig
     documentLink*: DocumentLinkConfig
     documentLinkResolve*: DocumentLinkResolveConfig
     signatureHelp*: SignatureHelpConfig
@@ -681,6 +698,32 @@ proc parseWorkspaceSymbol(symbolNode: JsonNode): WorkspaceSymbolContent =
   if symbolNode.contains("tags"):
     for tagNode in symbolNode["tags"]:
       result.tags.add(tagNode.getInt(0))
+  if symbolNode.hasKey("data"):
+    result.data = some(symbolNode["data"])
+
+proc parseWorkspaceSymbolResolve(symbolNode: JsonNode): WorkspaceSymbolResolveContent =
+  ## Parses a WorkspaceSymbol resolve item from a JSON node. Only `name` is
+  ## required; every other field is optional and only overrides the incoming
+  ## symbol when present. `data` is echoed back on workspace/symbol and used
+  ## to match the incoming resolve request together with `name`.
+  result = WorkspaceSymbolResolveContent(name: symbolNode["name"].getStr(""), tags: @[])
+  if symbolNode.hasKey("kind"):
+    result.kind = some(symbolNode["kind"].getInt(0))
+  if symbolNode.hasKey("deprecated"):
+    result.deprecated = some(symbolNode["deprecated"].getBool(false))
+  if symbolNode.hasKey("containerName"):
+    result.containerName = some(symbolNode["containerName"].getStr(""))
+  if symbolNode.contains("tags"):
+    for tagNode in symbolNode["tags"]:
+      result.tags.add(tagNode.getInt(0))
+  if symbolNode.hasKey("location"):
+    let loc = symbolNode["location"]
+    if loc.hasKey("uri"):
+      result.uri = some(loc["uri"].getStr(""))
+    if loc.hasKey("range"):
+      result.range = some(parseRange(loc["range"]))
+  if symbolNode.hasKey("data"):
+    result.data = some(symbolNode["data"])
 
 proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
   ## Parses a DocumentSymbol from a JSON node.
@@ -1553,6 +1596,21 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default workspace symbol config if not specified
           scenario.workspaceSymbol = WorkspaceSymbolConfig(enabled: false, symbols: @[])
 
+        if scenarioData.hasKey("workspaceSymbolResolve"):
+          # Load workspaceSymbol/resolve configuration
+          let resolveNode = scenarioData["workspaceSymbolResolve"]
+          var wsr = WorkspaceSymbolResolveConfig(
+            enabled: resolveNode{"enabled"}.getBool(false), items: @[]
+          )
+          if wsr.enabled and resolveNode.contains("items"):
+            for itemNode in resolveNode["items"]:
+              wsr.items.add(parseWorkspaceSymbolResolve(itemNode))
+          scenario.workspaceSymbolResolve = wsr
+        else:
+          # Default workspaceSymbolResolve config if not specified
+          scenario.workspaceSymbolResolve =
+            WorkspaceSymbolResolveConfig(enabled: false, items: @[])
+
         if scenarioData.hasKey("documentLink"):
           # Load document link configuration
           let documentLinkNode = scenarioData["documentLink"]
@@ -1758,6 +1816,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
             workspaceSymbol: delaysNode{"workspaceSymbol"}.getInt(0),
+            workspaceSymbolResolve: delaysNode{"workspaceSymbolResolve"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
             documentLinkResolve: delaysNode{"documentLinkResolve"}.getInt(0),
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
@@ -1795,6 +1854,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyOutgoing: 0,
             documentSymbol: 0,
             workspaceSymbol: 0,
+            workspaceSymbolResolve: 0,
             documentLink: 0,
             documentLinkResolve: 0,
             signatureHelp: 0,
@@ -1858,6 +1918,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     documentSymbol: DocumentSymbolConfig(enabled: false),
     workspaceSymbol: WorkspaceSymbolConfig(enabled: false),
+    workspaceSymbolResolve: WorkspaceSymbolResolveConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
     documentLinkResolve: DocumentLinkResolveConfig(enabled: false),
     signatureHelp: SignatureHelpConfig(enabled: false),
@@ -2051,6 +2112,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "callHierarchyOutgoing": 45,
           "documentSymbol": 40,
           "workspaceSymbol": 40,
+          "workspaceSymbolResolve": 40,
           "documentLink": 40,
           "documentLinkResolve": 40,
           "signatureHelp": 30,
@@ -2366,6 +2428,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
                   "end": {"line": 20, "character": 1},
                 },
               },
+              "data": {"symbolId": "MyClass-1"},
             },
             {
               "name": "helperFunction",
@@ -2379,6 +2442,22 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 },
               },
             },
+          ],
+        },
+        "workspaceSymbolResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "name": "MyClass",
+              "containerName": "myPackage (resolved)",
+              "location": {
+                "uri": "file:///path/to/file.nim",
+                "range": {
+                  "start": {"line": 0, "character": 0},
+                  "end": {"line": 30, "character": 1},
+                },
+              },
+            }
           ],
         },
         "documentLink": {
