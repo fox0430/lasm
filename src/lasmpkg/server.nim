@@ -278,6 +278,15 @@ proc handleCompletion*(
   asyncSpawn asyncWrapper()
   return requestFuture
 
+proc handleCompletionItemResolve(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleCompletionItemResolve(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleSemanticTokensFullImpl(
     server: LSPServer, id: JsonNode, params: JsonNode
 ) {.async.} =
@@ -578,6 +587,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleHover(id, params)
   of "textDocument/completion":
     await server.handleCompletion(id, params)
+  of "completionItem/resolve":
+    await server.handleCompletionItemResolve(id, params)
   of "textDocument/semanticTokens/full":
     await server.handleSemanticTokensFull(id, params)
   of "textDocument/semanticTokens/full/delta":

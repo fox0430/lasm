@@ -30,6 +30,15 @@ type
     items*: seq[CompletionContent]
     isIncomplete*: bool
 
+  CompletionResolveContent* = object
+    label*: string
+    detail*: Option[string]
+    documentation*: Option[string]
+
+  CompletionResolveConfig* = object
+    enabled*: bool
+    items*: seq[CompletionResolveContent]
+
   DiagnosticContent* = object
     range*: Range
     severity*: int # DiagnosticSeverity
@@ -325,6 +334,7 @@ type
   DelayConfig* = object
     hover*: int
     completion*: int
+    completionResolve*: int
     diagnostics*: int
     semanticTokens*: int
     semanticTokensDelta*: int
@@ -364,6 +374,7 @@ type
     name*: string
     hover*: HoverConfig
     completion*: CompletionConfig
+    completionResolve*: CompletionResolveConfig
     diagnostics*: DiagnosticConfig
     semanticTokens*: SemanticTokensConfig
     semanticTokensDelta*: SemanticTokensDeltaConfig
@@ -734,6 +745,26 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default completion config if not specified
           scenario.completion =
             CompletionConfig(enabled: false, isIncomplete: false, items: @[])
+
+        if scenarioData.hasKey("completionResolve"):
+          # Load completionItem/resolve configuration
+          let resolveNode = scenarioData["completionResolve"]
+          var crc =
+            CompletionResolveConfig(enabled: resolveNode{"enabled"}.getBool(false))
+          if crc.enabled and resolveNode.contains("items"):
+            crc.items = @[]
+            for itemNode in resolveNode["items"]:
+              var item = CompletionResolveContent(label: itemNode["label"].getStr(""))
+              if itemNode.contains("detail"):
+                item.detail = some(itemNode["detail"].getStr())
+              if itemNode.contains("documentation"):
+                item.documentation = some(itemNode["documentation"].getStr())
+              crc.items.add(item)
+          scenario.completionResolve = crc
+        else:
+          # Default completionResolve config if not specified
+          scenario.completionResolve =
+            CompletionResolveConfig(enabled: false, items: @[])
 
         if scenarioData.hasKey("diagnostics"):
           # Load diagnostics configuration
@@ -1543,6 +1574,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.delays = DelayConfig(
             hover: delaysNode{"hover"}.getInt(0),
             completion: delaysNode{"completion"}.getInt(0),
+            completionResolve: delaysNode{"completionResolve"}.getInt(0),
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
             semanticTokensDelta: delaysNode{"semanticTokensDelta"}.getInt(0),
@@ -1575,6 +1607,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.delays = DelayConfig(
             hover: 0,
             completion: 0,
+            completionResolve: 0,
             diagnostics: 0,
             semanticTokens: 0,
             semanticTokensDelta: 0,
@@ -1633,6 +1666,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     name: name,
     hover: HoverConfig(enabled: false),
     completion: CompletionConfig(enabled: false),
+    completionResolve: CompletionResolveConfig(enabled: false),
     diagnostics: DiagnosticConfig(enabled: false),
     semanticTokens: SemanticTokensConfig(enabled: false),
     semanticTokensDelta: SemanticTokensDeltaConfig(enabled: false),
@@ -1738,6 +1772,21 @@ proc createSampleConfig*(sm: ScenarioManager) =
             },
           ],
         },
+        "completionResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "label": "println",
+              "detail": "func println(message: string): void",
+              "documentation": "Prints a message to the console followed by a newline.",
+            },
+            {
+              "label": "TestClass",
+              "detail": "class TestClass (resolved)",
+              "documentation": "A test class enriched by completionItem/resolve.",
+            },
+          ],
+        },
         "diagnostics": {
           "enabled": true,
           "diagnostics": [
@@ -1786,6 +1835,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
         },
         "delays": {
           "completion": 100,
+          "completionResolve": 30,
           "diagnostics": 200,
           "hover": 50,
           "semanticTokens": 30,
