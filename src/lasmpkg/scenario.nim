@@ -167,6 +167,12 @@ type
     enabled*: bool
     workspaceEdit*: RenameWorkspaceEdit
 
+  PrepareRenameConfig* = object
+    enabled*: bool
+    range*: Option[Range]
+    placeholder*: Option[string]
+    defaultBehavior*: Option[bool]
+
   FormattingContent* = object
     range*: Range
     newText*: string
@@ -330,6 +336,7 @@ type
     references*: int
     documentHighlight*: int
     rename*: int
+    prepareRename*: int
     formatting*: int
     rangeFormatting*: int
     prepareCallHierarchy*: int
@@ -368,6 +375,7 @@ type
     references*: ReferenceConfig
     documentHighlight*: DocumentHighlightConfig
     rename*: RenameConfig
+    prepareRename*: PrepareRenameConfig
     formatting*: FormattingConfig
     rangeFormatting*: RangeFormattingConfig
     prepareCallHierarchy*: PrepareCallHierarchyConfig
@@ -1252,6 +1260,24 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             workspaceEdit: RenameWorkspaceEdit(changes: @[], documentChanges: @[]),
           )
 
+        if scenarioData.hasKey("prepareRename"):
+          # Load prepareRename configuration
+          let prepareRenameNode = scenarioData["prepareRename"]
+          var prc =
+            PrepareRenameConfig(enabled: prepareRenameNode{"enabled"}.getBool(false))
+          if prc.enabled:
+            if prepareRenameNode.contains("range"):
+              prc.range = some(parseRange(prepareRenameNode["range"]))
+            if prepareRenameNode.contains("placeholder"):
+              prc.placeholder = some(prepareRenameNode["placeholder"].getStr(""))
+            if prepareRenameNode.contains("defaultBehavior"):
+              prc.defaultBehavior =
+                some(prepareRenameNode["defaultBehavior"].getBool(false))
+          scenario.prepareRename = prc
+        else:
+          # Default prepareRename config if not specified
+          scenario.prepareRename = PrepareRenameConfig(enabled: false)
+
         if scenarioData.hasKey("formatting"):
           # Load formatting configuration
           let formattingNode = scenarioData["formatting"]
@@ -1528,6 +1554,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             references: delaysNode{"references"}.getInt(0),
             documentHighlight: delaysNode{"documentHighlight"}.getInt(0),
             rename: delaysNode{"rename"}.getInt(0),
+            prepareRename: delaysNode{"prepareRename"}.getInt(0),
             formatting: delaysNode{"formatting"}.getInt(0),
             rangeFormatting: delaysNode{"rangeFormatting"}.getInt(0),
             prepareCallHierarchy: delaysNode{"prepareCallHierarchy"}.getInt(0),
@@ -1559,6 +1586,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             references: 0,
             documentHighlight: 0,
             rename: 0,
+            prepareRename: 0,
             formatting: 0,
             rangeFormatting: 0,
             prepareCallHierarchy: 0,
@@ -1616,6 +1644,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     references: ReferenceConfig(enabled: false),
     documentHighlight: DocumentHighlightConfig(enabled: false),
     rename: RenameConfig(enabled: false),
+    prepareRename: PrepareRenameConfig(enabled: false),
     formatting: FormattingConfig(enabled: false),
     rangeFormatting: RangeFormattingConfig(enabled: false),
     prepareCallHierarchy: PrepareCallHierarchyConfig(enabled: false),
@@ -1769,6 +1798,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "references": 50,
           "documentHighlight": 45,
           "rename": 60,
+          "prepareRename": 30,
           "formatting": 40,
           "rangeFormatting": 40,
           "prepareCallHierarchy": 40,
@@ -1990,6 +2020,12 @@ proc createSampleConfig*(sm: ScenarioManager) =
               }
             ],
           },
+        },
+        "prepareRename": {
+          "enabled": true,
+          "range":
+            {"start": {"line": 5, "character": 10}, "end": {"line": 5, "character": 18}},
+          "placeholder": "oldName",
         },
         "formatting": {
           "enabled": true,

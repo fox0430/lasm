@@ -5587,3 +5587,251 @@ suite "lsp_handler module tests":
     check provider["codeActionKinds"].kind == JArray
     check provider["codeActionKinds"].len == 2
     check provider["codeActionKinds"][0].getStr() == "quickfix"
+
+  test "handlePrepareRename with disabled prepareRename":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 5},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JNull
+
+  test "handlePrepareRename returns range with placeholder":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename = PrepareRenameConfig(
+      enabled: true,
+      range: some(
+        Range(
+          start: Position(line: 5, character: 10),
+          `end`: Position(line: 5, character: 18),
+        )
+      ),
+      placeholder: some("oldName"),
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 5, "character": 12},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JObject
+    check response.hasKey("range")
+    check response.hasKey("placeholder")
+    check response["placeholder"].getStr() == "oldName"
+    check response["range"]["start"]["line"].getInt() == 5
+    check response["range"]["start"]["character"].getInt() == 10
+    check response["range"]["end"]["line"].getInt() == 5
+    check response["range"]["end"]["character"].getInt() == 18
+
+  test "handlePrepareRename returns range only":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename = PrepareRenameConfig(
+      enabled: true,
+      range: some(
+        Range(
+          start: Position(line: 2, character: 3), `end`: Position(line: 2, character: 9)
+        )
+      ),
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 2, "character": 5},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JObject
+    check not response.hasKey("placeholder")
+    check not response.hasKey("defaultBehavior")
+    check response["start"]["line"].getInt() == 2
+    check response["start"]["character"].getInt() == 3
+    check response["end"]["line"].getInt() == 2
+    check response["end"]["character"].getInt() == 9
+
+  test "handlePrepareRename returns defaultBehavior":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename =
+      PrepareRenameConfig(enabled: true, defaultBehavior: some(true))
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JObject
+    check response.hasKey("defaultBehavior")
+    check response["defaultBehavior"].getBool() == true
+
+  test "handlePrepareRename defaultBehavior takes precedence over range":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename = PrepareRenameConfig(
+      enabled: true,
+      range: some(
+        Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 5)
+        )
+      ),
+      placeholder: some("ignored"),
+      defaultBehavior: some(false),
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 2},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JObject
+    check response.hasKey("defaultBehavior")
+    check response["defaultBehavior"].getBool() == false
+    check not response.hasKey("range")
+    check not response.hasKey("placeholder")
+
+  test "handlePrepareRename with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename = PrepareRenameConfig(
+      enabled: true,
+      range: some(
+        Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 5)
+        )
+      ),
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    check response.kind == JNull
+
+  test "handlePrepareRename with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename = PrepareRenameConfig(
+      enabled: true,
+      range: some(
+        Range(
+          start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 3)
+        )
+      ),
+    )
+    scenarioManager.scenarios["default"].delays.prepareRename = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 1},
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleTextDocumentPrepareRename(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+
+    check response.kind == JObject
+    check response["start"]["line"].getInt() == 0
+
+  test "handlePrepareRename with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].prepareRename =
+      PrepareRenameConfig(enabled: true, defaultBehavior: some(true))
+    scenarioManager.scenarios["default"].errors["prepareRename"] =
+      ErrorConfig(code: -32603, message: "Prepare rename failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "position": {"line": 0, "character": 0},
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleTextDocumentPrepareRename(%1, params)
+
+  test "prepareRename capability in initialization when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("renameProvider")
+    # Default: plain boolean true
+    check response["capabilities"]["renameProvider"].getBool() == true
+
+  test "prepareRename capability in initialization when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].prepareRename =
+      PrepareRenameConfig(enabled: true, defaultBehavior: some(true))
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("renameProvider")
+    let provider = response["capabilities"]["renameProvider"]
+    check provider.kind == JObject
+    check provider.hasKey("prepareProvider")
+    check provider["prepareProvider"].getBool() == true
