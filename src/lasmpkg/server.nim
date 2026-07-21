@@ -506,6 +506,13 @@ proc handleCodeLens(server: LSPServer, id: JsonNode, params: JsonNode) {.async.}
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleCodeAction(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
+  try:
+    let response = await server.lspHandler.handleCodeAction(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -597,6 +604,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleFoldingRange(id, params)
   of "textDocument/codeLens":
     await server.handleCodeLens(id, params)
+  of "textDocument/codeAction":
+    await server.handleCodeAction(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

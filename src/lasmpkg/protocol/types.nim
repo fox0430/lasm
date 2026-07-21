@@ -562,6 +562,10 @@ type
   CodeLensOptions* = ref object of RootObj
     resolveProvider*: Option[bool]
 
+  CodeActionOptions* = ref object of RootObj
+    codeActionKinds*: OptionalSeq[string]
+    resolveProvider*: Option[bool]
+
   DocumentOnTypeFormattingOptions* = ref object of RootObj
     firstTriggerCharacter*: string
     moreTriggerCharacter*: OptionalSeq[string]
@@ -657,7 +661,7 @@ type
     documentHighlightProvider*: Option[bool]
     documentSymbolProvider*: Option[bool]
     workspaceSymbolProvider*: Option[bool]
-    codeActionProvider*: Option[bool]
+    codeActionProvider*: OptionalNode # bool or CodeActionOptions
     codeLensProvider*: CodeLensOptions
     documentLinkProvider*: Option[DocumentLinkOptions]
     # colorProvider?: boolean | DocumentColorOptions | DocumentColorRegistrationOptions;
@@ -930,6 +934,8 @@ type
 
   CodeActionContext* = ref object of RootObj
     diagnostics*: OptionalSeq[Diagnostic]
+    only*: OptionalSeq[string]
+    triggerKind*: Option[int]
 
   CodeLensParams* = ref object of RootObj
     textDocument*: TextDocumentIdentifier

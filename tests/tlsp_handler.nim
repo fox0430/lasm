@@ -5140,3 +5140,286 @@ suite "lsp_handler module tests":
     check response["capabilities"]["codeLensProvider"].hasKey("resolveProvider")
     check response["capabilities"]["codeLensProvider"]["resolveProvider"].getBool() ==
       false
+
+  test "handleCodeAction with disabled code action":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default") # codeAction disabled by default
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}},
+      "context": {"diagnostics": []},
+    }
+
+    let response = waitFor handler.handleCodeAction(%1, params)
+    check response.kind == JNull
+
+  test "handleCodeAction with enabled code action":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction = CodeActionConfig(
+      enabled: true,
+      codeActionKinds: @["quickfix", "refactor"],
+      actions: @[
+        CodeActionContent(
+          title: "Fix typo",
+          kind: some("quickfix"),
+          isPreferred: some(true),
+          edit: some(
+            CodeActionWorkspaceEdit(
+              changes: @[
+                CodeActionEditChange(
+                  uri: "file:///test.nim",
+                  edits: @[
+                    TextEdit(
+                      newText: "fixed",
+                      range: Range(
+                        start: Position(line: uinteger(0), character: uinteger(0)),
+                        `end`: Position(line: uinteger(0), character: uinteger(5)),
+                      ),
+                    )
+                  ],
+                )
+              ],
+              documentChanges: @[],
+            )
+          ),
+        ),
+        CodeActionContent(
+          title: "Extract function",
+          kind: some("refactor.extract"),
+          command: some(
+            CodeActionCommandContent(
+              title: "Extract",
+              command: "lasm.extractFunction",
+              arguments: some(%*["file:///test.nim"]),
+            )
+          ),
+          data: some(%*{"actionId": "sample-1"}),
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}},
+      "context": {"diagnostics": []},
+    }
+
+    let response = waitFor handler.handleCodeAction(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let first = response[0]
+    check first["title"].getStr() == "Fix typo"
+    check first["kind"].getStr() == "quickfix"
+    check first["isPreferred"].getBool() == true
+    check first["edit"].hasKey("changes")
+    check first["edit"]["changes"].hasKey("file:///test.nim")
+    let firstEdits = first["edit"]["changes"]["file:///test.nim"]
+    check firstEdits.kind == JArray
+    check firstEdits.len == 1
+    check firstEdits[0]["newText"].getStr() == "fixed"
+    check firstEdits[0]["range"]["end"]["character"].getInt() == 5
+    check not first.hasKey("command")
+
+    let second = response[1]
+    check second["title"].getStr() == "Extract function"
+    check second["kind"].getStr() == "refactor.extract"
+    check second["command"]["title"].getStr() == "Extract"
+    check second["command"]["command"].getStr() == "lasm.extractFunction"
+    check second["command"]["arguments"].kind == JArray
+    check second["command"]["arguments"].len == 1
+    check second["data"]["actionId"].getStr() == "sample-1"
+    check not second.hasKey("edit")
+
+  test "handleCodeAction with empty actions returns empty array":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction =
+      CodeActionConfig(enabled: true, codeActionKinds: @[], actions: @[])
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 5}},
+      "context": {"diagnostics": []},
+    }
+
+    let response = waitFor handler.handleCodeAction(%1, params)
+    check response.kind == JArray
+    check response.len == 0
+
+  test "handleCodeAction with unknown document":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction = CodeActionConfig(
+      enabled: true, codeActionKinds: @[], actions: @[CodeActionContent(title: "Fix")]
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///unknown.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+      "context": {"diagnostics": []},
+    }
+
+    let response = waitFor handler.handleCodeAction(%1, params)
+    check response.kind == JNull
+
+  test "handleCodeAction with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction = CodeActionConfig(
+      enabled: true, codeActionKinds: @[], actions: @[CodeActionContent(title: "Fix")]
+    )
+    scenarioManager.scenarios["default"].delays.codeAction = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+      "context": {"diagnostics": []},
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCodeAction(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleCodeAction with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction =
+      CodeActionConfig(enabled: true, codeActionKinds: @[], actions: @[])
+    scenarioManager.scenarios["default"].errors["codeAction"] =
+      ErrorConfig(code: -32603, message: "Code action failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 1)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+      "context": {"diagnostics": []},
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleCodeAction(%1, params)
+
+  test "handleCodeAction with documentChanges edit":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].codeAction = CodeActionConfig(
+      enabled: true,
+      codeActionKinds: @[],
+      actions: @[
+        CodeActionContent(
+          title: "Rewrite",
+          edit: some(
+            CodeActionWorkspaceEdit(
+              changes: @[],
+              documentChanges: @[
+                CodeActionDocumentChange(
+                  textDocument: VersionedTextDocumentIdentifier(
+                    uri: "file:///test.nim", version: some(%2)
+                  ),
+                  edits: @[
+                    TextEdit(
+                      newText: "new",
+                      range: Range(
+                        start: Position(line: uinteger(1), character: uinteger(0)),
+                        `end`: Position(line: uinteger(1), character: uinteger(3)),
+                      ),
+                    )
+                  ],
+                )
+              ],
+            )
+          ),
+        )
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    handler.documents["file:///test.nim"] =
+      Document(content: "test content", version: 2)
+
+    let params = %*{
+      "textDocument": {"uri": "file:///test.nim"},
+      "range":
+        {"start": {"line": 1, "character": 0}, "end": {"line": 1, "character": 3}},
+      "context": {"diagnostics": []},
+    }
+
+    let response = waitFor handler.handleCodeAction(%1, params)
+    check response.kind == JArray
+    check response.len == 1
+
+    let first = response[0]
+    check first["edit"].hasKey("documentChanges")
+    let docChanges = first["edit"]["documentChanges"]
+    check docChanges.kind == JArray
+    check docChanges.len == 1
+    check docChanges[0]["textDocument"]["uri"].getStr() == "file:///test.nim"
+    check docChanges[0]["textDocument"]["version"].getInt() == 2
+    check docChanges[0]["edits"][0]["newText"].getStr() == "new"
+
+  test "code action capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeAction = CodeActionConfig(
+      enabled: true, codeActionKinds: @["quickfix", "refactor"], actions: @[]
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeActionProvider")
+    let provider = response["capabilities"]["codeActionProvider"]
+    check provider.kind == JObject
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+    check provider.hasKey("codeActionKinds")
+    check provider["codeActionKinds"].kind == JArray
+    check provider["codeActionKinds"].len == 2
+    check provider["codeActionKinds"][0].getStr() == "quickfix"
