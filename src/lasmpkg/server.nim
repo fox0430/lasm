@@ -348,6 +348,15 @@ proc handleInlayHint(server: LSPServer, id: JsonNode, params: JsonNode) {.async.
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleInlayHintResolve(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleInlayHintResolve(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleDeclaration(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleDeclaration(id, params)
@@ -624,6 +633,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleSemanticTokensRange(id, params)
   of "textDocument/inlayHint":
     await server.handleInlayHint(id, params)
+  of "inlayHint/resolve":
+    await server.handleInlayHintResolve(id, params)
   of "textDocument/declaration":
     await server.handleDeclaration(id, params)
   of "textDocument/definition":

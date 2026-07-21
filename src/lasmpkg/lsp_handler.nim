@@ -94,7 +94,9 @@ proc handleInitialize*(
   serverCapabilities.semanticTokensProvider = some(semanticTokensOptions)
 
   # Set inlay hint provider
-  let inlayHintOptions = InlayHintOptions(resolveProvider: some(false))
+  var inlayHintOptions = InlayHintOptions(resolveProvider: some(false))
+  if currentScenario.inlayHintResolve.enabled:
+    inlayHintOptions.resolveProvider = some(true)
   serverCapabilities.inlayHintProvider = some(inlayHintOptions)
 
   # Set declaration provider
@@ -1075,12 +1077,67 @@ proc handleInlayHint*(
       if hintContent.textEdits.len > 0:
         hint.textEdits = some(hintContent.textEdits)
 
-      hints.add(%hint)
+      var hintJson = %hint
+      if hintContent.data.isSome:
+        hintJson["data"] = hintContent.data.get
+      hints.add(hintJson)
 
     return %hints
   else:
     # Document not found, return empty hints
     return %(@[])
+
+proc handleInlayHintResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.inlayHintResolve > 0:
+    await sleepAsync(scenario.delays.inlayHintResolve.milliseconds)
+
+  # Check for error injection
+  if "inlayHintResolve" in scenario.errors:
+    let error = scenario.errors["inlayHintResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the hint the client sent so unrecognised fields survive
+  # the round-trip (e.g. position/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the hint unchanged.
+  if not scenario.inlayHintResolve.enabled:
+    return resolved
+
+  # Match by position (line + character)
+  let posNode = resolved{"position"}
+  if posNode.isNil or posNode.kind != JObject:
+    return resolved
+
+  let line = posNode{"line"}.getInt(-1)
+  let character = posNode{"character"}.getInt(-1)
+
+  for item in scenario.inlayHintResolve.items:
+    if int(item.position.line) == line and int(item.position.character) == character:
+      if item.label.isSome:
+        resolved["label"] = %item.label.get
+      if item.kind.isSome:
+        resolved["kind"] = %item.kind.get
+      if item.tooltip.isSome:
+        resolved["tooltip"] = %item.tooltip.get
+      if item.paddingLeft.isSome:
+        resolved["paddingLeft"] = %item.paddingLeft.get
+      if item.paddingRight.isSome:
+        resolved["paddingRight"] = %item.paddingRight.get
+      if item.textEdits.len > 0:
+        resolved["textEdits"] = %item.textEdits
+      if item.data.isSome:
+        resolved["data"] = item.data.get
+      break
+
+  return resolved
 
 proc handleDeclaration*(
     handler: LSPHandler, id: JsonNode, params: JsonNode

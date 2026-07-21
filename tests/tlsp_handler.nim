@@ -6777,3 +6777,255 @@ suite "lsp_handler module tests":
 
     expect(LSPError):
       discard waitFor handler.handleDocumentLinkResolve(%1, params)
+
+  test "inlayHint/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("inlayHintProvider")
+    let provider = response["capabilities"]["inlayHintProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+
+  test "inlayHint/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve =
+      InlayHintResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("inlayHintProvider")
+    let provider = response["capabilities"]["inlayHintProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleInlayHintResolve returns hint unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "position": {"line": 1, "character": 20},
+      "label": ": string",
+      "data": {"hintId": "sample-1"},
+    }
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response.kind == JObject
+    check response["position"]["line"].getInt() == 1
+    check response["position"]["character"].getInt() == 20
+    check response["label"].getStr() == ": string"
+    check response["data"]["hintId"].getStr() == "sample-1"
+    check not response.hasKey("tooltip")
+
+  test "handleInlayHintResolve fills tooltip and textEdits for matching position":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 1, character: 20),
+          tooltip: some("Type annotation for parameter (resolved)"),
+          textEdits: @[
+            TextEdit(
+              range: Range(
+                start: Position(line: 1, character: 20),
+                `end`: Position(line: 1, character: 20),
+              ),
+              newText: ": string",
+            )
+          ],
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "position": {"line": 1, "character": 20},
+      "label": ": string",
+      "data": {"hintId": "sample-1"},
+    }
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response.kind == JObject
+    # Original fields are preserved
+    check response["position"]["line"].getInt() == 1
+    check response["label"].getStr() == ": string"
+    check response["data"]["hintId"].getStr() == "sample-1"
+    # Resolved fields are added
+    check response["tooltip"].getStr() == "Type annotation for parameter (resolved)"
+    check response.hasKey("textEdits")
+    check response["textEdits"].len == 1
+    check response["textEdits"][0]["newText"].getStr() == ": string"
+
+  test "handleInlayHintResolve fills data for matching position":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 2, character: 5),
+          data: some(%*{"resolved": true, "extra": "info"}),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"position": {"line": 2, "character": 5}, "label": "x"}
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["resolved"].getBool() == true
+    check response["data"]["extra"].getStr() == "info"
+
+  test "handleInlayHintResolve leaves unknown positions untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 1, character: 20), tooltip: some("resolved tooltip")
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"position": {"line": 99, "character": 0}, "label": ": string"}
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response.kind == JObject
+    check response["position"]["line"].getInt() == 99
+    check not response.hasKey("tooltip")
+
+  test "handleInlayHintResolve overrides existing label and tooltip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 0, character: 0),
+          label: some("resolved label"),
+          tooltip: some("resolved tooltip"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "position": {"line": 0, "character": 0},
+      "label": "stale label",
+      "tooltip": "stale tooltip",
+    }
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response["label"].getStr() == "resolved label"
+    check response["tooltip"].getStr() == "resolved tooltip"
+
+  test "handleInlayHintResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 2, character: 0), tooltip: some("resolved")
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "position": {"line": 2, "character": 0},
+      "label": "x",
+      "data": {"id": 42, "tag": "custom"},
+    }
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+    check response["tooltip"].getStr() == "resolved"
+
+  test "handleInlayHint emits data field when configured":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHint = InlayHintConfig(
+      enabled: true,
+      hints: @[
+        InlayHintContent(
+          position: Position(line: 1, character: 20),
+          label: ": string",
+          data: some(%*{"hintId": "sample-1"}),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let didOpen = %*{
+      "textDocument": {
+        "uri": "file:///test.nim",
+        "languageId": "nim",
+        "version": 1,
+        "text": "let x = 1",
+      }
+    }
+    discard waitFor handler.handleDidOpen(didOpen)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+    let response = waitFor handler.handleInlayHint(%1, params)
+
+    check response.kind == JArray
+    check response.len == 1
+    check response[0].hasKey("data")
+    check response[0]["data"]["hintId"].getStr() == "sample-1"
+
+  test "handleInlayHintResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve = InlayHintResolveConfig(
+      enabled: true,
+      items: @[
+        InlayHintResolveContent(
+          position: Position(line: 0, character: 0), tooltip: some("resolved")
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.inlayHintResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"position": {"line": 0, "character": 0}}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleInlayHintResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.hasKey("tooltip")
+
+  test "handleInlayHintResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].inlayHintResolve =
+      InlayHintResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["inlayHintResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"position": {"line": 0, "character": 0}}
+
+    expect(LSPError):
+      discard waitFor handler.handleInlayHintResolve(%1, params)
