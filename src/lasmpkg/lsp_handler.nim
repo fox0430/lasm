@@ -136,7 +136,10 @@ proc handleInitialize*(
   serverCapabilities.documentSymbolProvider = some(true)
 
   # Set workspace symbol provider
-  serverCapabilities.workspaceSymbolProvider = some(true)
+  var workspaceSymbolOptions = WorkspaceSymbolOptions(resolveProvider: some(false))
+  if currentScenario.workspaceSymbolResolve.enabled:
+    workspaceSymbolOptions.resolveProvider = some(true)
+  serverCapabilities.workspaceSymbolProvider = some(workspaceSymbolOptions)
 
   # Set document link provider
   let documentLinkOptions = DocumentLinkOptions(resolveProvider: some(false))
@@ -1772,6 +1775,8 @@ proc toWorkspaceSymbolJson(c: WorkspaceSymbolContent): JsonNode =
     result["containerName"] = %c.containerName.get
   if c.tags.len > 0:
     result["tags"] = %c.tags
+  if c.data.isSome:
+    result["data"] = c.data.get
 
 proc handleWorkspaceSymbol*(
     handler: LSPHandler, id: JsonNode, params: JsonNode
@@ -1805,6 +1810,60 @@ proc handleWorkspaceSymbol*(
     if lowerQuery.len == 0 or symbolContent.name.toLowerAscii().contains(lowerQuery):
       symbols.add(toWorkspaceSymbolJson(symbolContent))
   return %symbols
+
+proc handleWorkspaceSymbolResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.workspaceSymbolResolve > 0:
+    await sleepAsync(scenario.delays.workspaceSymbolResolve.milliseconds)
+
+  # Check for error injection
+  if "workspaceSymbolResolve" in scenario.errors:
+    let error = scenario.errors["workspaceSymbolResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the symbol the client sent so unrecognised fields survive
+  # the round-trip (e.g. name/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the symbol unchanged.
+  if not scenario.workspaceSymbolResolve.enabled:
+    return resolved
+
+  # Match by symbol name
+  let name = resolved{"name"}.getStr("")
+
+  for item in scenario.workspaceSymbolResolve.items:
+    if item.name == name:
+      if item.kind.isSome:
+        resolved["kind"] = %item.kind.get
+      if item.deprecated.isSome:
+        resolved["deprecated"] = %item.deprecated.get
+      if item.containerName.isSome:
+        resolved["containerName"] = %item.containerName.get
+      if item.tags.len > 0:
+        resolved["tags"] = %item.tags
+      if item.uri.isSome or item.range.isSome:
+        var location =
+          if resolved.hasKey("location") and resolved["location"].kind == JObject:
+            resolved["location"]
+          else:
+            newJObject()
+        if item.uri.isSome:
+          location["uri"] = %item.uri.get
+        if item.range.isSome:
+          location["range"] = %item.range.get
+        resolved["location"] = location
+      if item.data.isSome:
+        resolved["data"] = item.data.get
+      break
+
+  return resolved
 
 proc toDocumentLinkJson(c: DocumentLinkContent): JsonNode =
   result = newJObject()

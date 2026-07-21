@@ -645,6 +645,9 @@ type
   InlayHintOptions* = object
     resolveProvider*: Option[bool]
 
+  WorkspaceSymbolOptions* = object
+    resolveProvider*: Option[bool]
+
   ServerCapabilities* = ref object of RootObj
     #!!!positionEncoding*: Option[PositionEncodingKind_str]
     textDocumentSync*: OptionalNode # TextDocumentSyncOptions or TextDocumentSyncKind_int
@@ -660,7 +663,7 @@ type
     referencesProvider*: Option[bool]
     documentHighlightProvider*: Option[bool]
     documentSymbolProvider*: Option[bool]
-    workspaceSymbolProvider*: Option[bool]
+    workspaceSymbolProvider*: Option[WorkspaceSymbolOptions]
     codeActionProvider*: OptionalNode # bool or CodeActionOptions
     codeLensProvider*: CodeLensOptions
     documentLinkProvider*: Option[DocumentLinkOptions]

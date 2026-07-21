@@ -4125,7 +4125,9 @@ suite "lsp_handler module tests":
 
     check response.hasKey("capabilities")
     check response["capabilities"].hasKey("workspaceSymbolProvider")
-    check response["capabilities"]["workspaceSymbolProvider"].getBool() == true
+    let provider = response["capabilities"]["workspaceSymbolProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
 
   test "handleDocumentLink with disabled document link":
     let scenarioManager = createTestScenarioManager()
@@ -7029,3 +7031,242 @@ suite "lsp_handler module tests":
 
     expect(LSPError):
       discard waitFor handler.handleInlayHintResolve(%1, params)
+
+  test "workspaceSymbol/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("workspaceSymbolProvider")
+    let provider = response["capabilities"]["workspaceSymbolProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+
+  test "workspaceSymbol/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve =
+      WorkspaceSymbolResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("workspaceSymbolProvider")
+    let provider = response["capabilities"]["workspaceSymbolProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleWorkspaceSymbolResolve returns symbol unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "name": "MyClass",
+      "kind": 5,
+      "location": {
+        "uri": "file:///a.nim",
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 5, "character": 0}},
+      },
+      "data": {"symbolId": "MyClass-1"},
+    }
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response.kind == JObject
+    check response["name"].getStr() == "MyClass"
+    check response["kind"].getInt() == 5
+    check response["location"]["uri"].getStr() == "file:///a.nim"
+    check response["data"]["symbolId"].getStr() == "MyClass-1"
+    check not response.hasKey("containerName")
+
+  test "handleWorkspaceSymbolResolve fills containerName and location for matching name":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(
+          name: "MyClass",
+          containerName: some("myPackage (resolved)"),
+          uri: some("file:///path/to/file.nim"),
+          range: some(
+            Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 30, character: 1),
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "name": "MyClass",
+      "kind": 5,
+      "location": {
+        "uri": "file:///a.nim",
+        "range":
+          {"start": {"line": 0, "character": 0}, "end": {"line": 5, "character": 0}},
+      },
+      "data": {"symbolId": "MyClass-1"},
+    }
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response.kind == JObject
+    # Original fields are preserved
+    check response["name"].getStr() == "MyClass"
+    check response["kind"].getInt() == 5
+    check response["data"]["symbolId"].getStr() == "MyClass-1"
+    # Resolved fields are added/overridden
+    check response["containerName"].getStr() == "myPackage (resolved)"
+    check response["location"]["uri"].getStr() == "file:///path/to/file.nim"
+    check response["location"]["range"]["end"]["line"].getInt() == 30
+
+  test "handleWorkspaceSymbolResolve fills data for matching name":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(
+          name: "helperFunction", data: some(%*{"resolved": true, "extra": "info"})
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "helperFunction", "kind": 12}
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["resolved"].getBool() == true
+    check response["data"]["extra"].getStr() == "info"
+
+  test "handleWorkspaceSymbolResolve leaves unknown names untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(
+          name: "MyClass", containerName: some("resolved container")
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "OtherSymbol", "kind": 12}
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response.kind == JObject
+    check response["name"].getStr() == "OtherSymbol"
+    check not response.hasKey("containerName")
+
+  test "handleWorkspaceSymbolResolve overrides existing containerName":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(
+          name: "MyClass", containerName: some("resolved container")
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "MyClass", "containerName": "stale container"}
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response["containerName"].getStr() == "resolved container"
+
+  test "handleWorkspaceSymbolResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(name: "MyClass", containerName: some("resolved"))
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "MyClass", "kind": 5, "data": {"id": 42, "tag": "custom"}}
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+    check response["containerName"].getStr() == "resolved"
+
+  test "handleWorkspaceSymbol emits data field when configured":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbol = WorkspaceSymbolConfig(
+      enabled: true,
+      symbols: @[
+        WorkspaceSymbolContent(
+          name: "MyClass",
+          kind: 5,
+          tags: @[],
+          uri: "file:///a.nim",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 5, character: 0),
+          ),
+          data: some(%*{"symbolId": "MyClass-1"}),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"query": ""}
+    let response = waitFor handler.handleWorkspaceSymbol(%1, params)
+
+    check response.kind == JArray
+    check response.len == 1
+    check response[0].hasKey("data")
+    check response[0]["data"]["symbolId"].getStr() == "MyClass-1"
+
+  test "handleWorkspaceSymbolResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve = WorkspaceSymbolResolveConfig(
+      enabled: true,
+      items: @[
+        WorkspaceSymbolResolveContent(name: "MyClass", containerName: some("resolved"))
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.workspaceSymbolResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "MyClass"}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleWorkspaceSymbolResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.hasKey("containerName")
+
+  test "handleWorkspaceSymbolResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].workspaceSymbolResolve =
+      WorkspaceSymbolResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["workspaceSymbolResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"name": "MyClass"}
+
+    expect(LSPError):
+      discard waitFor handler.handleWorkspaceSymbolResolve(%1, params)

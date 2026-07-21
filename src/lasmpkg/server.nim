@@ -507,6 +507,15 @@ proc handleWorkspaceSymbol(
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleWorkspaceSymbolResolve(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleWorkspaceSymbolResolve(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleDocumentLink(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleDocumentLink(id, params)
@@ -665,6 +674,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleDocumentSymbol(id, params)
   of "workspace/symbol":
     await server.handleWorkspaceSymbol(id, params)
+  of "workspaceSymbol/resolve":
+    await server.handleWorkspaceSymbolResolve(id, params)
   of "textDocument/documentLink":
     await server.handleDocumentLink(id, params)
   of "documentLink/resolve":
