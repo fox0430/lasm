@@ -197,6 +197,19 @@ type
     enabled*: bool
     symbols*: seq[DocumentSymbolContent]
 
+  WorkspaceSymbolContent* = object
+    name*: string
+    kind*: int # SymbolKind
+    tags*: seq[int] # SymbolTag
+    deprecated*: Option[bool]
+    uri*: string
+    range*: Range
+    containerName*: Option[string]
+
+  WorkspaceSymbolConfig* = object
+    enabled*: bool
+    symbols*: seq[WorkspaceSymbolContent]
+
   ParameterInformationContent* = object
     label*: string
     documentation*: Option[string]
@@ -323,6 +336,7 @@ type
     callHierarchyIncoming*: int
     callHierarchyOutgoing*: int
     documentSymbol*: int
+    workspaceSymbol*: int
     documentLink*: int
     signatureHelp*: int
     selectionRange*: int
@@ -360,6 +374,7 @@ type
     callHierarchyIncoming*: CallHierarchyIncomingConfig
     callHierarchyOutgoing*: CallHierarchyOutgoingConfig
     documentSymbol*: DocumentSymbolConfig
+    workspaceSymbol*: WorkspaceSymbolConfig
     documentLink*: DocumentLinkConfig
     signatureHelp*: SignatureHelpConfig
     selectionRange*: SelectionRangeConfig
@@ -538,6 +553,23 @@ proc parseSignatureInformation(sigNode: JsonNode): SignatureInformationContent =
   if sigNode.contains("parameters"):
     for paramNode in sigNode["parameters"]:
       result.parameters.add(parseParameterInformation(paramNode))
+
+proc parseWorkspaceSymbol(symbolNode: JsonNode): WorkspaceSymbolContent =
+  ## Parses a WorkspaceSymbol (SymbolInformation shape) from a JSON node.
+  result = WorkspaceSymbolContent(
+    name: symbolNode["name"].getStr(""),
+    kind: symbolNode{"kind"}.getInt(0),
+    tags: @[],
+    uri: symbolNode{"location"}{"uri"}.getStr(""),
+    range: parseRange(symbolNode["location"]["range"]),
+  )
+  if symbolNode.hasKey("deprecated"):
+    result.deprecated = some(symbolNode["deprecated"].getBool(false))
+  if symbolNode.hasKey("containerName"):
+    result.containerName = some(symbolNode["containerName"].getStr(""))
+  if symbolNode.contains("tags"):
+    for tagNode in symbolNode["tags"]:
+      result.tags.add(tagNode.getInt(0))
 
 proc parseDocumentSymbol(symbolNode: JsonNode): DocumentSymbolContent =
   ## Parses a DocumentSymbol from a JSON node.
@@ -1340,6 +1372,21 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default document symbol config if not specified
           scenario.documentSymbol = DocumentSymbolConfig(enabled: false, symbols: @[])
 
+        if scenarioData.hasKey("workspaceSymbol"):
+          # Load workspace symbol configuration
+          let workspaceSymbolNode = scenarioData["workspaceSymbol"]
+          var ws = WorkspaceSymbolConfig(
+            enabled: workspaceSymbolNode["enabled"].getBool(false)
+          )
+          if ws.enabled and workspaceSymbolNode.contains("symbols"):
+            ws.symbols = @[]
+            for symbolNode in workspaceSymbolNode["symbols"]:
+              ws.symbols.add(parseWorkspaceSymbol(symbolNode))
+          scenario.workspaceSymbol = ws
+        else:
+          # Default workspace symbol config if not specified
+          scenario.workspaceSymbol = WorkspaceSymbolConfig(enabled: false, symbols: @[])
+
         if scenarioData.hasKey("documentLink"):
           # Load document link configuration
           let documentLinkNode = scenarioData["documentLink"]
@@ -1487,6 +1534,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyIncoming: delaysNode{"callHierarchyIncoming"}.getInt(0),
             callHierarchyOutgoing: delaysNode{"callHierarchyOutgoing"}.getInt(0),
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
+            workspaceSymbol: delaysNode{"workspaceSymbol"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
@@ -1517,6 +1565,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             callHierarchyIncoming: 0,
             callHierarchyOutgoing: 0,
             documentSymbol: 0,
+            workspaceSymbol: 0,
             documentLink: 0,
             signatureHelp: 0,
             selectionRange: 0,
@@ -1573,6 +1622,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     callHierarchyIncoming: CallHierarchyIncomingConfig(enabled: false),
     callHierarchyOutgoing: CallHierarchyOutgoingConfig(enabled: false),
     documentSymbol: DocumentSymbolConfig(enabled: false),
+    workspaceSymbol: WorkspaceSymbolConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
     signatureHelp: SignatureHelpConfig(enabled: false),
     selectionRange: SelectionRangeConfig(enabled: false),
@@ -1725,6 +1775,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "callHierarchyIncoming": 45,
           "callHierarchyOutgoing": 45,
           "documentSymbol": 40,
+          "workspaceSymbol": 40,
           "documentLink": 40,
           "signatureHelp": 30,
           "selectionRange": 30,
@@ -2015,6 +2066,35 @@ proc createSampleConfig*(sm: ScenarioManager) =
                 },
               ],
             }
+          ],
+        },
+        "workspaceSymbol": {
+          "enabled": true,
+          "symbols": [
+            {
+              "name": "MyClass",
+              "kind": 5,
+              "containerName": "myPackage",
+              "location": {
+                "uri": "file:///path/to/file.nim",
+                "range": {
+                  "start": {"line": 0, "character": 0},
+                  "end": {"line": 20, "character": 1},
+                },
+              },
+            },
+            {
+              "name": "helperFunction",
+              "kind": 12,
+              "containerName": "utils",
+              "location": {
+                "uri": "file:///path/to/utils.nim",
+                "range": {
+                  "start": {"line": 5, "character": 0},
+                  "end": {"line": 8, "character": 1},
+                },
+              },
+            },
           ],
         },
         "documentLink": {

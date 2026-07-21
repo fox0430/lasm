@@ -3963,6 +3963,170 @@ suite "lsp_handler module tests":
     check response["capabilities"].hasKey("documentSymbolProvider")
     check response["capabilities"]["documentSymbolProvider"].getBool() == true
 
+  test "handleWorkspaceSymbol with disabled workspace symbol":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"query": ""}
+
+    let response = waitFor handler.handleWorkspaceSymbol(%1, params)
+    check response.kind == JNull
+
+  test "handleWorkspaceSymbol with enabled workspace symbol":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].workspaceSymbol = WorkspaceSymbolConfig(
+      enabled: true,
+      symbols: @[
+        WorkspaceSymbolContent(
+          name: "MyClass",
+          kind: 5,
+          tags: @[],
+          containerName: some("myPackage"),
+          uri: "file:///path/to/file.nim",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 20, character: 1),
+          ),
+        ),
+        WorkspaceSymbolContent(
+          name: "helperFunction",
+          kind: 12,
+          tags: @[],
+          uri: "file:///path/to/utils.nim",
+          range: Range(
+            start: Position(line: 5, character: 0),
+            `end`: Position(line: 8, character: 1),
+          ),
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"query": ""}
+
+    let response = waitFor handler.handleWorkspaceSymbol(%1, params)
+    check response.kind == JArray
+    check response.len == 2
+
+    let first = response[0]
+    check first["name"].getStr() == "MyClass"
+    check first["kind"].getInt() == 5
+    check first["containerName"].getStr() == "myPackage"
+    check first["location"]["uri"].getStr() == "file:///path/to/file.nim"
+    check first["location"]["range"]["start"]["line"].getInt() == 0
+    check first["location"]["range"]["end"]["line"].getInt() == 20
+
+    let second = response[1]
+    check second["name"].getStr() == "helperFunction"
+    check second["kind"].getInt() == 12
+
+  test "handleWorkspaceSymbol filters by query":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].workspaceSymbol = WorkspaceSymbolConfig(
+      enabled: true,
+      symbols: @[
+        WorkspaceSymbolContent(
+          name: "MyClass",
+          kind: 5,
+          tags: @[],
+          uri: "file:///a.nim",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 1, character: 0),
+          ),
+        ),
+        WorkspaceSymbolContent(
+          name: "helperFunction",
+          kind: 12,
+          tags: @[],
+          uri: "file:///b.nim",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 1, character: 0),
+          ),
+        ),
+      ],
+    )
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    # Case-insensitive substring match
+    let params = %*{"query": "help"}
+
+    let response = waitFor handler.handleWorkspaceSymbol(%1, params)
+    check response.kind == JArray
+    check response.len == 1
+    check response[0]["name"].getStr() == "helperFunction"
+
+  test "handleWorkspaceSymbol with delay":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].workspaceSymbol = WorkspaceSymbolConfig(
+      enabled: true,
+      symbols: @[
+        WorkspaceSymbolContent(
+          name: "sym",
+          kind: 13,
+          tags: @[],
+          uri: "file:///a.nim",
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 3),
+          ),
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.workspaceSymbol = 100
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"query": ""}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleWorkspaceSymbol(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+
+    check response.kind == JArray
+    check response.len == 1
+
+  test "handleWorkspaceSymbol with error injection":
+    let scenarioManager = createTestScenarioManager()
+
+    scenarioManager.scenarios["default"].workspaceSymbol =
+      WorkspaceSymbolConfig(enabled: true, symbols: @[])
+    scenarioManager.scenarios["default"].errors["workspaceSymbol"] =
+      ErrorConfig(code: -32603, message: "Workspace symbol failed")
+
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"query": ""}
+
+    expect(LSPError):
+      discard waitFor handler.handleWorkspaceSymbol(%1, params)
+
+  test "workspace symbol capability in initialization":
+    let scenarioManager = createTestScenarioManager()
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("workspaceSymbolProvider")
+    check response["capabilities"]["workspaceSymbolProvider"].getBool() == true
+
   test "handleDocumentLink with disabled document link":
     let scenarioManager = createTestScenarioManager()
     discard scenarioManager.setScenario("default") # documentLink disabled by default

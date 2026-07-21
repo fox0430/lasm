@@ -127,6 +127,9 @@ proc handleInitialize*(
   # Set document symbol provider
   serverCapabilities.documentSymbolProvider = some(true)
 
+  # Set workspace symbol provider
+  serverCapabilities.workspaceSymbolProvider = some(true)
+
   # Set document link provider
   let documentLinkOptions = DocumentLinkOptions(resolveProvider: some(false))
   serverCapabilities.documentLinkProvider = some(documentLinkOptions)
@@ -1613,6 +1616,51 @@ proc handleDocumentSymbol*(
   else:
     # Document not found
     return newJNull()
+
+proc toWorkspaceSymbolJson(c: WorkspaceSymbolContent): JsonNode =
+  result = newJObject()
+  result["name"] = %c.name
+  result["kind"] = %c.kind
+  result["location"] = %*{"uri": c.uri, "range": %c.range}
+  if c.deprecated.isSome:
+    result["deprecated"] = %c.deprecated.get
+  if c.containerName.isSome:
+    result["containerName"] = %c.containerName.get
+  if c.tags.len > 0:
+    result["tags"] = %c.tags
+
+proc handleWorkspaceSymbol*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.workspaceSymbol > 0:
+    await sleepAsync(scenario.delays.workspaceSymbol.milliseconds)
+
+  # Check if workspace symbol is enabled
+  if not scenario.workspaceSymbol.enabled:
+    return newJNull()
+
+  # Check for error injection
+  if "workspaceSymbol" in scenario.errors:
+    let error = scenario.errors["workspaceSymbol"]
+    raise newException(LSPError, error.message)
+
+  let query =
+    if params.hasKey("query"):
+      params["query"].getStr("")
+    else:
+      ""
+
+  # Filter symbols by query (case-insensitive substring match).
+  # An empty query returns all configured symbols.
+  var symbols: seq[JsonNode] = @[]
+  let lowerQuery = query.toLowerAscii()
+  for symbolContent in scenario.workspaceSymbol.symbols:
+    if lowerQuery.len == 0 or symbolContent.name.toLowerAscii().contains(lowerQuery):
+      symbols.add(toWorkspaceSymbolJson(symbolContent))
+  return %symbols
 
 proc toDocumentLinkJson(c: DocumentLinkContent): JsonNode =
   result = newJObject()
