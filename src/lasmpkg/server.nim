@@ -533,6 +533,15 @@ proc handleCodeLens(server: LSPServer, id: JsonNode, params: JsonNode) {.async.}
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleCodeLensResolve(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    let response = await server.lspHandler.handleCodeLensResolve(id, params)
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+
 proc handleCodeAction(server: LSPServer, id: JsonNode, params: JsonNode) {.async.} =
   try:
     let response = await server.lspHandler.handleCodeAction(id, params)
@@ -646,6 +655,8 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleFoldingRange(id, params)
   of "textDocument/codeLens":
     await server.handleCodeLens(id, params)
+  of "codeLens/resolve":
+    await server.handleCodeLensResolve(id, params)
   of "textDocument/codeAction":
     await server.handleCodeAction(id, params)
   of "codeAction/resolve":

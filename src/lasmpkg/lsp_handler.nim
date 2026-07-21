@@ -147,7 +147,10 @@ proc handleInitialize*(
   serverCapabilities.foldingRangeProvider = some(FoldingRangeOptions())
 
   # Set code lens provider
-  serverCapabilities.codeLensProvider = CodeLensOptions(resolveProvider: some(false))
+  let codeLensOptions = CodeLensOptions(resolveProvider: some(false))
+  if currentScenario.codeLensResolve.enabled:
+    codeLensOptions.resolveProvider = some(true)
+  serverCapabilities.codeLensProvider = codeLensOptions
 
   # Set code action provider
   let codeActionOptions = CodeActionOptions(resolveProvider: some(false))
@@ -1982,6 +1985,59 @@ proc handleCodeLens*(
   else:
     # Document not found
     return newJNull()
+
+proc handleCodeLensResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.codeLensResolve > 0:
+    await sleepAsync(scenario.delays.codeLensResolve.milliseconds)
+
+  # Check for error injection
+  if "codeLensResolve" in scenario.errors:
+    let error = scenario.errors["codeLensResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the lens the client sent so unrecognised fields survive
+  # the round-trip (e.g. range/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the lens unchanged.
+  if not scenario.codeLensResolve.enabled:
+    return resolved
+
+  # Match by range (start/end line + character)
+  let rangeNode = resolved{"range"}
+  if rangeNode.isNil or rangeNode.kind != JObject:
+    return resolved
+
+  let startLine = rangeNode{"start"}{"line"}.getInt(-1)
+  let startChar = rangeNode{"start"}{"character"}.getInt(-1)
+  let endLine = rangeNode{"end"}{"line"}.getInt(-1)
+  let endChar = rangeNode{"end"}{"character"}.getInt(-1)
+
+  for item in scenario.codeLensResolve.items:
+    if int(item.range.start.line) == startLine and
+        int(item.range.start.character) == startChar and
+        int(item.range.`end`.line) == endLine and
+        int(item.range.`end`.character) == endChar:
+      if item.command.isSome:
+        let cmd = item.command.get
+        var cmdJson = newJObject()
+        cmdJson["title"] = %cmd.title
+        cmdJson["command"] = %cmd.command
+        if cmd.arguments.isSome:
+          cmdJson["arguments"] = cmd.arguments.get
+        resolved["command"] = cmdJson
+      if item.data.isSome:
+        resolved["data"] = item.data.get
+      break
+
+  return resolved
 
 proc toTextEditJson(edit: TextEdit): JsonNode =
   result = newJObject()
