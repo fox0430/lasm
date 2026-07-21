@@ -286,6 +286,15 @@ type
     enabled*: bool
     lenses*: seq[CodeLensContent]
 
+  CodeLensResolveContent* = object
+    range*: Range
+    command*: Option[CodeLensCommandContent]
+    data*: Option[JsonNode]
+
+  CodeLensResolveConfig* = object
+    enabled*: bool
+    items*: seq[CodeLensResolveContent]
+
   CodeActionCommandContent* = object
     title*: string
     command*: string
@@ -368,6 +377,7 @@ type
     selectionRange*: int
     foldingRange*: int
     codeLens*: int
+    codeLensResolve*: int
     codeAction*: int
     codeActionResolve*: int
     progress*: int
@@ -409,6 +419,7 @@ type
     selectionRange*: SelectionRangeConfig
     foldingRange*: FoldingRangeConfig
     codeLens*: CodeLensConfig
+    codeLensResolve*: CodeLensResolveConfig
     codeAction*: CodeActionConfig
     codeActionResolve*: CodeActionResolveConfig
     progress*: ProgressConfig
@@ -1542,6 +1553,25 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default code lens config if not specified
           scenario.codeLens = CodeLensConfig(enabled: false, lenses: @[])
 
+        if scenarioData.hasKey("codeLensResolve"):
+          # Load codeLens/resolve configuration
+          let resolveNode = scenarioData["codeLensResolve"]
+          var clr = CodeLensResolveConfig(
+            enabled: resolveNode{"enabled"}.getBool(false), items: @[]
+          )
+          if clr.enabled and resolveNode.contains("items"):
+            for itemNode in resolveNode["items"]:
+              let base = parseCodeLens(itemNode)
+              clr.items.add(
+                CodeLensResolveContent(
+                  range: base.range, command: base.command, data: base.data
+                )
+              )
+          scenario.codeLensResolve = clr
+        else:
+          # Default codeLensResolve config if not specified
+          scenario.codeLensResolve = CodeLensResolveConfig(enabled: false, items: @[])
+
         if scenarioData.hasKey("codeAction"):
           # Load code action configuration
           let codeActionNode = scenarioData["codeAction"]
@@ -1630,6 +1660,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
             foldingRange: delaysNode{"foldingRange"}.getInt(0),
             codeLens: delaysNode{"codeLens"}.getInt(0),
+            codeLensResolve: delaysNode{"codeLensResolve"}.getInt(0),
             codeAction: delaysNode{"codeAction"}.getInt(0),
             codeActionResolve: delaysNode{"codeActionResolve"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
@@ -1664,6 +1695,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             selectionRange: 0,
             foldingRange: 0,
             codeLens: 0,
+            codeLensResolve: 0,
             codeAction: 0,
             codeActionResolve: 0,
             progress: 0,
@@ -1724,6 +1756,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     selectionRange: SelectionRangeConfig(enabled: false),
     foldingRange: FoldingRangeConfig(enabled: false),
     codeLens: CodeLensConfig(enabled: false),
+    codeLensResolve: CodeLensResolveConfig(enabled: false),
     codeAction: CodeActionConfig(enabled: false),
     codeActionResolve: CodeActionResolveConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
@@ -1895,6 +1928,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "selectionRange": 30,
           "foldingRange": 30,
           "codeLens": 30,
+          "codeLensResolve": 30,
           "codeAction": 30,
           "codeActionResolve": 30,
           "progress": 0,
@@ -2322,6 +2356,22 @@ proc createSampleConfig*(sm: ScenarioManager) =
               "command": {"title": "Run test", "command": "lasm.runTest"},
               "data": {"testId": "sample-1"},
             },
+          ],
+        },
+        "codeLensResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "range": {
+                "start": {"line": 5, "character": 0},
+                "end": {"line": 5, "character": 15},
+              },
+              "command": {
+                "title": "Run test (resolved)",
+                "command": "lasm.runTest",
+                "arguments": ["file:///path/to/test.nim", "sample-1"],
+              },
+            }
           ],
         },
         "codeAction": {

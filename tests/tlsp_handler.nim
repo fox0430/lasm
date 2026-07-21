@@ -6269,3 +6269,269 @@ suite "lsp_handler module tests":
 
     expect(LSPError):
       discard waitFor handler.handleCodeActionResolve(%1, params)
+
+  test "codeLens/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeLensProvider")
+    let provider = response["capabilities"]["codeLensProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+
+  test "codeLens/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve =
+      CodeLensResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeLensProvider")
+    let provider = response["capabilities"]["codeLensProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleCodeLensResolve returns lens unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 5, "character": 0}, "end": {"line": 5, "character": 15}},
+      "data": {"testId": "sample-1"},
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response.kind == JObject
+    check response["range"]["start"]["line"].getInt() == 5
+    check response["data"]["testId"].getStr() == "sample-1"
+    check not response.hasKey("command")
+
+  test "handleCodeLensResolve fills command for matching range":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 5, character: 0),
+            `end`: Position(line: 5, character: 15),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "Run test (resolved)",
+              command: "lasm.runTest",
+              arguments: some(%*["arg1"]),
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 5, "character": 0}, "end": {"line": 5, "character": 15}},
+      "data": {"testId": "sample-1"},
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response.kind == JObject
+    # Original fields are preserved
+    check response["range"]["start"]["line"].getInt() == 5
+    check response["data"]["testId"].getStr() == "sample-1"
+    # Resolved command is added
+    check response.hasKey("command")
+    check response["command"]["title"].getStr() == "Run test (resolved)"
+    check response["command"]["command"].getStr() == "lasm.runTest"
+    check response["command"]["arguments"].kind == JArray
+    check response["command"]["arguments"][0].getStr() == "arg1"
+
+  test "handleCodeLensResolve fills data for matching range":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 10),
+          ),
+          data: some(%*{"resolved": true, "extra": "info"}),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}}
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["resolved"].getBool() == true
+    check response["data"]["extra"].getStr() == "info"
+
+  test "handleCodeLensResolve leaves unknown ranges untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 5, character: 0),
+            `end`: Position(line: 5, character: 15),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "Run test (resolved)",
+              command: "lasm.runTest",
+              arguments: none(JsonNode),
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 99, "character": 0}, "end": {"line": 99, "character": 5}}
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response.kind == JObject
+    check response["range"]["start"]["line"].getInt() == 99
+    check not response.hasKey("command")
+
+  test "handleCodeLensResolve overrides existing command":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 10),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "resolved title",
+              command: "lasm.resolved",
+              arguments: none(JsonNode),
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}},
+      "command": {"title": "stale title", "command": "lasm.stale"},
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response["command"]["title"].getStr() == "resolved title"
+    check response["command"]["command"].getStr() == "lasm.resolved"
+
+  test "handleCodeLensResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 1, character: 0),
+            `end`: Position(line: 1, character: 5),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "Go", command: "lasm.go", arguments: none(JsonNode)
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 1, "character": 0}, "end": {"line": 1, "character": 5}},
+      "data": {"id": 42, "tag": "custom"},
+    }
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+    check response["command"]["title"].getStr() == "Go"
+
+  test "handleCodeLensResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve = CodeLensResolveConfig(
+      enabled: true,
+      items: @[
+        CodeLensResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 1),
+          ),
+          command: some(
+            CodeLensCommandContent(
+              title: "Run", command: "lasm.run", arguments: none(JsonNode)
+            )
+          ),
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.codeLensResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}}
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCodeLensResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.hasKey("command")
+
+  test "handleCodeLensResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeLensResolve =
+      CodeLensResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["codeLensResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}}
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleCodeLensResolve(%1, params)
