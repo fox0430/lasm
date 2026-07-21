@@ -138,6 +138,8 @@ proc handleInitialize*(
 
   # Set document link provider
   let documentLinkOptions = DocumentLinkOptions(resolveProvider: some(false))
+  if currentScenario.documentLinkResolve.enabled:
+    documentLinkOptions.resolveProvider = some(true)
   serverCapabilities.documentLinkProvider = some(documentLinkOptions)
 
   # Set selection range provider
@@ -1787,6 +1789,55 @@ proc handleDocumentLink*(
   else:
     # Document not found
     return newJNull()
+
+proc handleDocumentLinkResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.documentLinkResolve > 0:
+    await sleepAsync(scenario.delays.documentLinkResolve.milliseconds)
+
+  # Check for error injection
+  if "documentLinkResolve" in scenario.errors:
+    let error = scenario.errors["documentLinkResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the link the client sent so unrecognised fields survive
+  # the round-trip (e.g. range/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the link unchanged.
+  if not scenario.documentLinkResolve.enabled:
+    return resolved
+
+  # Match by range (start/end line + character)
+  let rangeNode = resolved{"range"}
+  if rangeNode.isNil or rangeNode.kind != JObject:
+    return resolved
+
+  let startLine = rangeNode{"start"}{"line"}.getInt(-1)
+  let startChar = rangeNode{"start"}{"character"}.getInt(-1)
+  let endLine = rangeNode{"end"}{"line"}.getInt(-1)
+  let endChar = rangeNode{"end"}{"character"}.getInt(-1)
+
+  for item in scenario.documentLinkResolve.items:
+    if int(item.range.start.line) == startLine and
+        int(item.range.start.character) == startChar and
+        int(item.range.`end`.line) == endLine and
+        int(item.range.`end`.character) == endChar:
+      if item.target.isSome:
+        resolved["target"] = %item.target.get
+      if item.tooltip.isSome:
+        resolved["tooltip"] = %item.tooltip.get
+      if item.data.isSome:
+        resolved["data"] = item.data.get
+      break
+
+  return resolved
 
 proc toParameterInformationJson(c: ParameterInformationContent): JsonNode =
   result = newJObject()

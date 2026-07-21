@@ -252,6 +252,16 @@ type
     enabled*: bool
     links*: seq[DocumentLinkContent]
 
+  DocumentLinkResolveContent* = object
+    range*: Range
+    target*: Option[string]
+    tooltip*: Option[string]
+    data*: Option[JsonNode]
+
+  DocumentLinkResolveConfig* = object
+    enabled*: bool
+    items*: seq[DocumentLinkResolveContent]
+
   SelectionRangeContent* = ref object
     range*: Range
     parent*: Option[SelectionRangeContent]
@@ -373,6 +383,7 @@ type
     documentSymbol*: int
     workspaceSymbol*: int
     documentLink*: int
+    documentLinkResolve*: int
     signatureHelp*: int
     selectionRange*: int
     foldingRange*: int
@@ -415,6 +426,7 @@ type
     documentSymbol*: DocumentSymbolConfig
     workspaceSymbol*: WorkspaceSymbolConfig
     documentLink*: DocumentLinkConfig
+    documentLinkResolve*: DocumentLinkResolveConfig
     signatureHelp*: SignatureHelpConfig
     selectionRange*: SelectionRangeConfig
     foldingRange*: FoldingRangeConfig
@@ -471,6 +483,19 @@ proc parseDocumentLink(linkNode: JsonNode): DocumentLinkContent =
     result.target = some(linkNode["target"].getStr(""))
   if linkNode.hasKey("tooltip"):
     result.tooltip = some(linkNode["tooltip"].getStr(""))
+
+proc parseDocumentLinkResolve(linkNode: JsonNode): DocumentLinkResolveContent =
+  ## Parses a DocumentLink resolve item from a JSON node. In addition to
+  ## the fields on a plain DocumentLink, it may carry a `data` payload
+  ## that is echoed back on textDocument/documentLink and used to match
+  ## the incoming resolve request.
+  result = DocumentLinkResolveContent(range: parseRange(linkNode["range"]))
+  if linkNode.hasKey("target"):
+    result.target = some(linkNode["target"].getStr(""))
+  if linkNode.hasKey("tooltip"):
+    result.tooltip = some(linkNode["tooltip"].getStr(""))
+  if linkNode.hasKey("data"):
+    result.data = some(linkNode["data"])
 
 proc parseSelectionRange(rangeNode: JsonNode): SelectionRangeContent =
   ## Parses a SelectionRange from a JSON node. The optional `parent`
@@ -1480,6 +1505,21 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           # Default document link config if not specified
           scenario.documentLink = DocumentLinkConfig(enabled: false, links: @[])
 
+        if scenarioData.hasKey("documentLinkResolve"):
+          # Load documentLink/resolve configuration
+          let resolveNode = scenarioData["documentLinkResolve"]
+          var dlr = DocumentLinkResolveConfig(
+            enabled: resolveNode{"enabled"}.getBool(false), items: @[]
+          )
+          if dlr.enabled and resolveNode.contains("items"):
+            for itemNode in resolveNode["items"]:
+              dlr.items.add(parseDocumentLinkResolve(itemNode))
+          scenario.documentLinkResolve = dlr
+        else:
+          # Default documentLinkResolve config if not specified
+          scenario.documentLinkResolve =
+            DocumentLinkResolveConfig(enabled: false, items: @[])
+
         if scenarioData.hasKey("signatureHelp"):
           # Load signature help configuration
           let signatureHelpNode = scenarioData["signatureHelp"]
@@ -1656,6 +1696,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentSymbol: delaysNode{"documentSymbol"}.getInt(0),
             workspaceSymbol: delaysNode{"workspaceSymbol"}.getInt(0),
             documentLink: delaysNode{"documentLink"}.getInt(0),
+            documentLinkResolve: delaysNode{"documentLinkResolve"}.getInt(0),
             signatureHelp: delaysNode{"signatureHelp"}.getInt(0),
             selectionRange: delaysNode{"selectionRange"}.getInt(0),
             foldingRange: delaysNode{"foldingRange"}.getInt(0),
@@ -1691,6 +1732,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             documentSymbol: 0,
             workspaceSymbol: 0,
             documentLink: 0,
+            documentLinkResolve: 0,
             signatureHelp: 0,
             selectionRange: 0,
             foldingRange: 0,
@@ -1752,6 +1794,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     documentSymbol: DocumentSymbolConfig(enabled: false),
     workspaceSymbol: WorkspaceSymbolConfig(enabled: false),
     documentLink: DocumentLinkConfig(enabled: false),
+    documentLinkResolve: DocumentLinkResolveConfig(enabled: false),
     signatureHelp: SignatureHelpConfig(enabled: false),
     selectionRange: SelectionRangeConfig(enabled: false),
     foldingRange: FoldingRangeConfig(enabled: false),
@@ -1924,6 +1967,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "documentSymbol": 40,
           "workspaceSymbol": 40,
           "documentLink": 40,
+          "documentLinkResolve": 40,
           "signatureHelp": 30,
           "selectionRange": 30,
           "foldingRange": 30,
@@ -2270,6 +2314,19 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "target": "file:///path/to/other.nim",
             },
+          ],
+        },
+        "documentLinkResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "range": {
+                "start": {"line": 0, "character": 4},
+                "end": {"line": 0, "character": 24},
+              },
+              "target": "https://example.com/docs/resolved",
+              "tooltip": "Open documentation (resolved)",
+            }
           ],
         },
         "signatureHelp": {

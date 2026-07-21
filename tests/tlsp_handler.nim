@@ -6535,3 +6535,245 @@ suite "lsp_handler module tests":
 
     expect(LSPError):
       discard waitFor handler.handleCodeLensResolve(%1, params)
+
+  test "documentLink/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentLinkProvider")
+    let provider = response["capabilities"]["documentLinkProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+
+  test "documentLink/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve =
+      DocumentLinkResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("documentLinkProvider")
+    let provider = response["capabilities"]["documentLinkProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleDocumentLinkResolve returns link unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 4}, "end": {"line": 0, "character": 24}},
+      "data": {"linkId": "sample-1"},
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response.kind == JObject
+    check response["range"]["start"]["character"].getInt() == 4
+    check response["data"]["linkId"].getStr() == "sample-1"
+    check not response.hasKey("target")
+    check not response.hasKey("tooltip")
+
+  test "handleDocumentLinkResolve fills target and tooltip for matching range":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 4),
+            `end`: Position(line: 0, character: 24),
+          ),
+          target: some("https://example.com/docs/resolved"),
+          tooltip: some("Open documentation (resolved)"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 4}, "end": {"line": 0, "character": 24}},
+      "data": {"linkId": "sample-1"},
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response.kind == JObject
+    # Original fields are preserved
+    check response["range"]["start"]["character"].getInt() == 4
+    check response["data"]["linkId"].getStr() == "sample-1"
+    # Resolved fields are added
+    check response["target"].getStr() == "https://example.com/docs/resolved"
+    check response["tooltip"].getStr() == "Open documentation (resolved)"
+
+  test "handleDocumentLinkResolve fills data for matching range":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 1, character: 0),
+            `end`: Position(line: 1, character: 10),
+          ),
+          data: some(%*{"resolved": true, "extra": "info"}),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 1, "character": 0}, "end": {"line": 1, "character": 10}}
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["resolved"].getBool() == true
+    check response["data"]["extra"].getStr() == "info"
+
+  test "handleDocumentLinkResolve leaves unknown ranges untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 4),
+            `end`: Position(line: 0, character: 24),
+          ),
+          target: some("https://example.com/docs/resolved"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 99, "character": 0}, "end": {"line": 99, "character": 5}}
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response.kind == JObject
+    check response["range"]["start"]["line"].getInt() == 99
+    check not response.hasKey("target")
+    check not response.hasKey("tooltip")
+
+  test "handleDocumentLinkResolve overrides existing target":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 10),
+          ),
+          target: some("https://example.com/resolved"),
+          tooltip: some("resolved tooltip"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 10}},
+      "target": "https://example.com/stale",
+      "tooltip": "stale tooltip",
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response["target"].getStr() == "https://example.com/resolved"
+    check response["tooltip"].getStr() == "resolved tooltip"
+
+  test "handleDocumentLinkResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 2, character: 0),
+            `end`: Position(line: 2, character: 5),
+          ),
+          target: some("file:///path/to/target.nim"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 2, "character": 0}, "end": {"line": 2, "character": 5}},
+      "data": {"id": 42, "tag": "custom"},
+    }
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+    check response["target"].getStr() == "file:///path/to/target.nim"
+
+  test "handleDocumentLinkResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve = DocumentLinkResolveConfig(
+      enabled: true,
+      items: @[
+        DocumentLinkResolveContent(
+          range: Range(
+            start: Position(line: 0, character: 0),
+            `end`: Position(line: 0, character: 1),
+          ),
+          target: some("https://example.com"),
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.documentLinkResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}}
+    }
+
+    let startTime = getTime()
+    let response = waitFor handler.handleDocumentLinkResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.hasKey("target")
+
+  test "handleDocumentLinkResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].documentLinkResolve =
+      DocumentLinkResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["documentLinkResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "range":
+        {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}}
+    }
+
+    expect(LSPError):
+      discard waitFor handler.handleDocumentLinkResolve(%1, params)
