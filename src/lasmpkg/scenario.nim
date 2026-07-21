@@ -318,6 +318,15 @@ type
     codeActionKinds*: seq[string]
     actions*: seq[CodeActionContent]
 
+  CodeActionResolveContent* = object
+    title*: string
+    edit*: Option[CodeActionWorkspaceEdit]
+    command*: Option[CodeActionCommandContent]
+
+  CodeActionResolveConfig* = object
+    enabled*: bool
+    items*: seq[CodeActionResolveContent]
+
   ProgressNotificationContent* = object
     kind*: string # "begin" | "report" | "end"
     title*: Option[string]
@@ -360,6 +369,7 @@ type
     foldingRange*: int
     codeLens*: int
     codeAction*: int
+    codeActionResolve*: int
     progress*: int
 
   ErrorConfig* = object
@@ -400,6 +410,7 @@ type
     foldingRange*: FoldingRangeConfig
     codeLens*: CodeLensConfig
     codeAction*: CodeActionConfig
+    codeActionResolve*: CodeActionResolveConfig
     progress*: ProgressConfig
     delays*: DelayConfig
     errors*: Table[string, ErrorConfig]
@@ -1551,6 +1562,26 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           scenario.codeAction =
             CodeActionConfig(enabled: false, codeActionKinds: @[], actions: @[])
 
+        if scenarioData.hasKey("codeActionResolve"):
+          # Load codeAction/resolve configuration
+          let resolveNode = scenarioData["codeActionResolve"]
+          var car = CodeActionResolveConfig(
+            enabled: resolveNode{"enabled"}.getBool(false), items: @[]
+          )
+          if car.enabled and resolveNode.contains("items"):
+            for itemNode in resolveNode["items"]:
+              let base = parseCodeAction(itemNode)
+              car.items.add(
+                CodeActionResolveContent(
+                  title: base.title, edit: base.edit, command: base.command
+                )
+              )
+          scenario.codeActionResolve = car
+        else:
+          # Default codeActionResolve config if not specified
+          scenario.codeActionResolve =
+            CodeActionResolveConfig(enabled: false, items: @[])
+
         if scenarioData.hasKey("progress"):
           # Load progress configuration
           let progressNode = scenarioData["progress"]
@@ -1600,6 +1631,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             foldingRange: delaysNode{"foldingRange"}.getInt(0),
             codeLens: delaysNode{"codeLens"}.getInt(0),
             codeAction: delaysNode{"codeAction"}.getInt(0),
+            codeActionResolve: delaysNode{"codeActionResolve"}.getInt(0),
             progress: delaysNode{"progress"}.getInt(0),
           )
         else:
@@ -1633,6 +1665,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             foldingRange: 0,
             codeLens: 0,
             codeAction: 0,
+            codeActionResolve: 0,
             progress: 0,
           )
 
@@ -1692,6 +1725,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     foldingRange: FoldingRangeConfig(enabled: false),
     codeLens: CodeLensConfig(enabled: false),
     codeAction: CodeActionConfig(enabled: false),
+    codeActionResolve: CodeActionResolveConfig(enabled: false),
     progress: ProgressConfig(enabled: false),
     delays: DelayConfig(),
     errors: initTable[string, ErrorConfig](),
@@ -1862,6 +1896,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "foldingRange": 30,
           "codeLens": 30,
           "codeAction": 30,
+          "codeActionResolve": 30,
           "progress": 0,
         },
         "semanticTokens": {
@@ -2324,6 +2359,30 @@ proc createSampleConfig*(sm: ScenarioManager) =
               },
               "data": {"actionId": "sample-1"},
             },
+          ],
+        },
+        "codeActionResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "title": "Refactor: extract function",
+              "edit": {
+                "changes": [
+                  {
+                    "uri": "file:///path/to/test.nim",
+                    "edits": [
+                      {
+                        "range": {
+                          "start": {"line": 1, "character": 0},
+                          "end": {"line": 1, "character": 0},
+                        },
+                        "newText": "proc extracted() = discard\n",
+                      }
+                    ],
+                  }
+                ]
+              },
+            }
           ],
         },
         "progress": {

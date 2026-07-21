@@ -153,6 +153,8 @@ proc handleInitialize*(
   let codeActionOptions = CodeActionOptions(resolveProvider: some(false))
   if currentScenario.codeAction.codeActionKinds.len > 0:
     codeActionOptions.codeActionKinds = some(currentScenario.codeAction.codeActionKinds)
+  if currentScenario.codeActionResolve.enabled:
+    codeActionOptions.resolveProvider = some(true)
   serverCapabilities.codeActionProvider = some(%codeActionOptions)
 
   # Create the InitializeResult
@@ -2069,3 +2071,44 @@ proc handleCodeAction*(
   else:
     # Document not found
     return newJNull()
+
+proc handleCodeActionResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.codeActionResolve > 0:
+    await sleepAsync(scenario.delays.codeActionResolve.milliseconds)
+
+  # Check for error injection
+  if "codeActionResolve" in scenario.errors:
+    let error = scenario.errors["codeActionResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the action the client sent so unrecognised fields survive
+  # the round-trip (e.g. kind/diagnostics/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the action unchanged.
+  if not scenario.codeActionResolve.enabled:
+    return resolved
+
+  let title = resolved{"title"}.getStr("")
+  for item in scenario.codeActionResolve.items:
+    if item.title == title:
+      if item.edit.isSome:
+        resolved["edit"] = toCodeActionWorkspaceEditJson(item.edit.get)
+      if item.command.isSome:
+        let cmd = item.command.get
+        var cmdJson = newJObject()
+        cmdJson["title"] = %cmd.title
+        cmdJson["command"] = %cmd.command
+        if cmd.arguments.isSome:
+          cmdJson["arguments"] = cmd.arguments.get
+        resolved["command"] = cmdJson
+      break
+
+  return resolved
