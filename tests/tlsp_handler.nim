@@ -6006,3 +6006,266 @@ suite "lsp_handler module tests":
 
     expect(LSPError):
       discard waitFor handler.handleCompletionItemResolve(%1, params)
+
+  test "codeAction/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeAction =
+      CodeActionConfig(enabled: true, codeActionKinds: @[], actions: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeActionProvider")
+    let provider = response["capabilities"]["codeActionProvider"]
+    check provider.kind == JObject
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == false
+
+  test "codeAction/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeAction =
+      CodeActionConfig(enabled: true, codeActionKinds: @[], actions: @[])
+    scenarioManager.scenarios["default"].codeActionResolve =
+      CodeActionResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("codeActionProvider")
+    let provider = response["capabilities"]["codeActionProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleCodeActionResolve returns action unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Refactor: extract function", "kind": "refactor.extract"}
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response.kind == JObject
+    check response["title"].getStr() == "Refactor: extract function"
+    check response["kind"].getStr() == "refactor.extract"
+    check not response.hasKey("edit")
+    check not response.hasKey("command")
+
+  test "handleCodeActionResolve fills edit for matching title":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Refactor: extract function",
+          edit: some(
+            CodeActionWorkspaceEdit(
+              changes: @[
+                CodeActionEditChange(
+                  uri: "file:///test.nim",
+                  edits: @[
+                    TextEdit(
+                      range: Range(
+                        start: Position(line: 1, character: 0),
+                        `end`: Position(line: 1, character: 0),
+                      ),
+                      newText: "proc extracted() = discard\n",
+                    )
+                  ],
+                )
+              ],
+              documentChanges: @[],
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "title": "Refactor: extract function",
+      "kind": "refactor.extract",
+      "data": {"actionId": "sample-1"},
+    }
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response.kind == JObject
+    check response["title"].getStr() == "Refactor: extract function"
+    # Original fields are preserved
+    check response["kind"].getStr() == "refactor.extract"
+    check response["data"]["actionId"].getStr() == "sample-1"
+    # Resolved edit is added
+    check response.hasKey("edit")
+    check response["edit"].hasKey("changes")
+    let changes = response["edit"]["changes"]
+    check changes.hasKey("file:///test.nim")
+    check changes["file:///test.nim"][0]["newText"].getStr() ==
+      "proc extracted() = discard\n"
+
+  test "handleCodeActionResolve fills command for matching title":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Run test",
+          command: some(
+            CodeActionCommandContent(
+              title: "Run", command: "lasm.runTest", arguments: some(%*["arg1"])
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Run test", "kind": "source"}
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response.hasKey("command")
+    check response["command"]["title"].getStr() == "Run"
+    check response["command"]["command"].getStr() == "lasm.runTest"
+    check response["command"]["arguments"].kind == JArray
+    check response["command"]["arguments"][0].getStr() == "arg1"
+
+  test "handleCodeActionResolve leaves unknown titles untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Refactor: extract function",
+          edit: some(CodeActionWorkspaceEdit(changes: @[], documentChanges: @[])),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Not In List", "kind": "quickfix"}
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response.kind == JObject
+    check response["title"].getStr() == "Not In List"
+    check response["kind"].getStr() == "quickfix"
+    check not response.hasKey("edit")
+    check not response.hasKey("command")
+
+  test "handleCodeActionResolve overrides existing edit":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Fix",
+          edit: some(
+            CodeActionWorkspaceEdit(
+              changes: @[
+                CodeActionEditChange(
+                  uri: "file:///resolved.nim",
+                  edits: @[
+                    TextEdit(
+                      range: Range(
+                        start: Position(line: 0, character: 0),
+                        `end`: Position(line: 0, character: 0),
+                      ),
+                      newText: "resolved",
+                    )
+                  ],
+                )
+              ],
+              documentChanges: @[],
+            )
+          ),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{
+      "title": "Fix",
+      "edit": {
+        "changes": {
+          "file:///stale.nim": [
+            {
+              "range": {
+                "start": {"line": 9, "character": 9}, "end": {"line": 9, "character": 9}
+              },
+              "newText": "stale",
+            }
+          ]
+        }
+      },
+    }
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response["edit"]["changes"].hasKey("file:///resolved.nim")
+    check not response["edit"]["changes"].hasKey("file:///stale.nim")
+
+  test "handleCodeActionResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Fix",
+          edit: some(CodeActionWorkspaceEdit(changes: @[], documentChanges: @[])),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Fix", "data": {"id": 42, "tag": "custom"}}
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+
+  test "handleCodeActionResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve = CodeActionResolveConfig(
+      enabled: true,
+      items: @[
+        CodeActionResolveContent(
+          title: "Fix",
+          edit: some(CodeActionWorkspaceEdit(changes: @[], documentChanges: @[])),
+        )
+      ],
+    )
+    scenarioManager.scenarios["default"].delays.codeActionResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Fix"}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCodeActionResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response.hasKey("edit")
+
+  test "handleCodeActionResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].codeActionResolve =
+      CodeActionResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["codeActionResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"title": "Fix"}
+
+    expect(LSPError):
+      discard waitFor handler.handleCodeActionResolve(%1, params)
