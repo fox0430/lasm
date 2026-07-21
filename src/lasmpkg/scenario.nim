@@ -74,10 +74,25 @@ type
     paddingLeft*: Option[bool]
     paddingRight*: Option[bool]
     textEdits*: seq[TextEdit]
+    data*: Option[JsonNode]
 
   InlayHintConfig* = object
     enabled*: bool
     hints*: seq[InlayHintContent]
+
+  InlayHintResolveContent* = object
+    position*: Position
+    label*: Option[string]
+    kind*: Option[int]
+    tooltip*: Option[string]
+    paddingLeft*: Option[bool]
+    paddingRight*: Option[bool]
+    textEdits*: seq[TextEdit]
+    data*: Option[JsonNode]
+
+  InlayHintResolveConfig* = object
+    enabled*: bool
+    items*: seq[InlayHintResolveContent]
 
   DeclarationContent* = object
     uri*: string
@@ -367,6 +382,7 @@ type
     semanticTokens*: int
     semanticTokensDelta*: int
     inlayHint*: int
+    inlayHintResolve*: int
     declaration*: int
     definition*: int
     typeDefinition*: int
@@ -410,6 +426,7 @@ type
     semanticTokens*: SemanticTokensConfig
     semanticTokensDelta*: SemanticTokensDeltaConfig
     inlayHint*: InlayHintConfig
+    inlayHintResolve*: InlayHintResolveConfig
     declaration*: DeclarationConfig
     definition*: DefinitionConfig
     typeDefinition*: TypeDefinitionConfig
@@ -541,6 +558,34 @@ proc parseTextEditContent(editNode: JsonNode): TextEdit =
   result = TextEdit()
   result.newText = editNode{"newText"}.getStr("")
   result.range = parseRange(editNode["range"])
+
+proc parseInlayHintResolve(hintNode: JsonNode): InlayHintResolveContent =
+  ## Parses an InlayHint resolve item from a JSON node. Only `position` is
+  ## required; every other field is optional and only overrides the
+  ## incoming hint when present. `data` is echoed back on textDocument/inlayHint
+  ## and used to match the incoming resolve request.
+  result = InlayHintResolveContent(
+    position: Position(
+      line: uinteger(hintNode["position"]["line"].getInt(0)),
+      character: uinteger(hintNode["position"]["character"].getInt(0)),
+    )
+  )
+  if hintNode.hasKey("label"):
+    result.label = some(hintNode["label"].getStr(""))
+  if hintNode.hasKey("kind"):
+    result.kind = some(hintNode["kind"].getInt())
+  if hintNode.hasKey("tooltip"):
+    result.tooltip = some(hintNode["tooltip"].getStr(""))
+  if hintNode.hasKey("paddingLeft"):
+    result.paddingLeft = some(hintNode["paddingLeft"].getBool())
+  if hintNode.hasKey("paddingRight"):
+    result.paddingRight = some(hintNode["paddingRight"].getBool())
+  if hintNode.hasKey("textEdits"):
+    result.textEdits = @[]
+    for editNode in hintNode["textEdits"]:
+      result.textEdits.add(parseTextEditContent(editNode))
+  if hintNode.hasKey("data"):
+    result.data = some(hintNode["data"])
 
 proc parseCodeAction(actionNode: JsonNode): CodeActionContent =
   ## Parses a CodeAction from a JSON node. Only `title` is required;
@@ -961,11 +1006,28 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
                   )
                   hint.textEdits.add(textEdit)
 
+              if hintNode.contains("data"):
+                hint.data = some(hintNode["data"])
+
               ih.hints.add(hint)
           scenario.inlayHint = ih
         else:
           # Default inlay hint config if not specified
           scenario.inlayHint = InlayHintConfig(enabled: false, hints: @[])
+
+        if scenarioData.hasKey("inlayHintResolve"):
+          # Load inlayHint/resolve configuration
+          let resolveNode = scenarioData["inlayHintResolve"]
+          var ihr = InlayHintResolveConfig(
+            enabled: resolveNode{"enabled"}.getBool(false), items: @[]
+          )
+          if ihr.enabled and resolveNode.contains("items"):
+            for itemNode in resolveNode["items"]:
+              ihr.items.add(parseInlayHintResolve(itemNode))
+          scenario.inlayHintResolve = ihr
+        else:
+          # Default inlayHintResolve config if not specified
+          scenario.inlayHintResolve = InlayHintResolveConfig(enabled: false, items: @[])
 
         if scenarioData.hasKey("declaration"):
           # Load declaration configuration
@@ -1680,6 +1742,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
             semanticTokensDelta: delaysNode{"semanticTokensDelta"}.getInt(0),
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
+            inlayHintResolve: delaysNode{"inlayHintResolve"}.getInt(0),
             declaration: delaysNode{"declaration"}.getInt(0),
             definition: delaysNode{"definition"}.getInt(0),
             typeDefinition: delaysNode{"typeDefinition"}.getInt(0),
@@ -1716,6 +1779,7 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             semanticTokens: 0,
             semanticTokensDelta: 0,
             inlayHint: 0,
+            inlayHintResolve: 0,
             declaration: 0,
             definition: 0,
             typeDefinition: 0,
@@ -1778,6 +1842,7 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     semanticTokens: SemanticTokensConfig(enabled: false),
     semanticTokensDelta: SemanticTokensDeltaConfig(enabled: false),
     inlayHint: InlayHintConfig(enabled: false),
+    inlayHintResolve: InlayHintResolveConfig(enabled: false),
     declaration: DeclarationConfig(enabled: false),
     definition: DefinitionConfig(enabled: false),
     typeDefinition: TypeDefinitionConfig(enabled: false),
@@ -1932,6 +1997,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
               "tooltip": "Type annotation for parameter",
               "paddingLeft": false,
               "paddingRight": false,
+              "data": {"hintId": "sample-1"},
             },
             {
               "position": {"line": 3, "character": 15},
@@ -1943,6 +2009,24 @@ proc createSampleConfig*(sm: ScenarioManager) =
             },
           ],
         },
+        "inlayHintResolve": {
+          "enabled": true,
+          "items": [
+            {
+              "position": {"line": 1, "character": 20},
+              "tooltip": "Type annotation for parameter (resolved)",
+              "textEdits": [
+                {
+                  "range": {
+                    "start": {"line": 1, "character": 20},
+                    "end": {"line": 1, "character": 20},
+                  },
+                  "newText": ": string",
+                }
+              ],
+            }
+          ],
+        },
         "delays": {
           "completion": 100,
           "completionResolve": 30,
@@ -1951,6 +2035,7 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "semanticTokens": 30,
           "semanticTokensDelta": 30,
           "inlayHint": 25,
+          "inlayHintResolve": 25,
           "declaration": 40,
           "definition": 35,
           "typeDefinition": 30,
