@@ -42,9 +42,13 @@ proc handleInitialize*(
   textDocSyncOptions.save = some(SaveOptions(includeText: some(true)))
   serverCapabilities.textDocumentSync = some(%textDocSyncOptions)
 
+  let currentScenario = handler.scenarioManager.getCurrentScenario()
+
   # Set completion provider
   let completionOptions = CompletionOptions()
   completionOptions.triggerCharacters = some(@[".", ":", "(", " "])
+  if currentScenario.completionResolve.enabled:
+    completionOptions.resolveProvider = some(true)
   serverCapabilities.completionProvider = completionOptions
 
   # Set hover provider
@@ -52,7 +56,6 @@ proc handleInitialize*(
 
   # Set signature help provider
   let signatureHelpOptions = SignatureHelpOptions()
-  let currentScenario = handler.scenarioManager.getCurrentScenario()
   if currentScenario.signatureHelp.triggerCharacters.len > 0:
     signatureHelpOptions.triggerCharacters =
       some(currentScenario.signatureHelp.triggerCharacters)
@@ -818,6 +821,41 @@ proc handleCompletion*(
     completionList.items.get.add(completionItem)
 
   return %completionList
+
+proc handleCompletionItemResolve*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  # Apply delay if configured
+  if scenario.delays.completionResolve > 0:
+    await sleepAsync(scenario.delays.completionResolve.milliseconds)
+
+  # Check for error injection
+  if "completionResolve" in scenario.errors:
+    let error = scenario.errors["completionResolve"]
+    raise newException(LSPError, error.message)
+
+  # Start from the item the client sent so unrecognised fields survive
+  # the round-trip (e.g. sortText/filterText/data).
+  var resolved = params
+  if resolved.kind != JObject:
+    resolved = newJObject()
+
+  # If resolve is disabled, return the item unchanged.
+  if not scenario.completionResolve.enabled:
+    return resolved
+
+  let label = resolved{"label"}.getStr("")
+  for item in scenario.completionResolve.items:
+    if item.label == label:
+      if item.detail.isSome:
+        resolved["detail"] = %item.detail.get
+      if item.documentation.isSome:
+        resolved["documentation"] = %item.documentation.get
+      break
+
+  return resolved
 
 proc handleInitialized*(handler: LSPHandler): seq[JsonNode] =
   # Create the ShowMessageParams using protocol types

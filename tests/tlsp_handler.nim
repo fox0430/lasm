@@ -5835,3 +5835,174 @@ suite "lsp_handler module tests":
     check provider.kind == JObject
     check provider.hasKey("prepareProvider")
     check provider["prepareProvider"].getBool() == true
+
+  test "completionItem/resolve capability disabled by default":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("completionProvider")
+    let provider = response["capabilities"]["completionProvider"]
+    # When resolve is disabled, the field is either absent or null/false
+    if provider.hasKey("resolveProvider"):
+      check provider["resolveProvider"].kind in {JNull, JBool}
+      if provider["resolveProvider"].kind == JBool:
+        check provider["resolveProvider"].getBool() == false
+
+  test "completionItem/resolve capability advertised when enabled":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve =
+      CompletionResolveConfig(enabled: true, items: @[])
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"processId": 1234, "capabilities": {}, "rootUri": "file:///test"}
+
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    check response.hasKey("capabilities")
+    check response["capabilities"].hasKey("completionProvider")
+    let provider = response["capabilities"]["completionProvider"]
+    check provider.hasKey("resolveProvider")
+    check provider["resolveProvider"].getBool() == true
+
+  test "handleCompletionItemResolve returns item unchanged when disabled":
+    let scenarioManager = createTestScenarioManager()
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "println", "kind": 3}
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+
+    check response.kind == JObject
+    check response["label"].getStr() == "println"
+    check response["kind"].getInt() == 3
+    check not response.hasKey("detail")
+    check not response.hasKey("documentation")
+
+  test "handleCompletionItemResolve enriches matching label":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve = CompletionResolveConfig(
+      enabled: true,
+      items: @[
+        CompletionResolveContent(
+          label: "println",
+          detail: some("func println(message: string): void"),
+          documentation: some("Prints to stdout."),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "println", "kind": 3, "insertText": "println($1)"}
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+
+    check response.kind == JObject
+    check response["label"].getStr() == "println"
+    # Original fields are preserved
+    check response["kind"].getInt() == 3
+    check response["insertText"].getStr() == "println($1)"
+    # Resolved fields are added
+    check response["detail"].getStr() == "func println(message: string): void"
+    check response["documentation"].getStr() == "Prints to stdout."
+
+  test "handleCompletionItemResolve leaves unknown labels untouched":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve = CompletionResolveConfig(
+      enabled: true,
+      items: @[
+        CompletionResolveContent(
+          label: "println", detail: some("func println(message: string): void")
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "notInList", "kind": 6}
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+
+    check response.kind == JObject
+    check response["label"].getStr() == "notInList"
+    check response["kind"].getInt() == 6
+    check not response.hasKey("detail")
+    check not response.hasKey("documentation")
+
+  test "handleCompletionItemResolve overrides existing detail":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve = CompletionResolveConfig(
+      enabled: true,
+      items: @[
+        CompletionResolveContent(
+          label: "println",
+          detail: some("resolved detail"),
+          documentation: some("resolved doc"),
+        )
+      ],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params =
+      %*{"label": "println", "detail": "stale detail", "documentation": "stale doc"}
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+
+    check response["detail"].getStr() == "resolved detail"
+    check response["documentation"].getStr() == "resolved doc"
+
+  test "handleCompletionItemResolve preserves data field for round-trip":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve = CompletionResolveConfig(
+      enabled: true,
+      items: @[CompletionResolveContent(label: "println", detail: some("resolved"))],
+    )
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "println", "data": {"id": 42, "tag": "custom"}}
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+
+    check response.hasKey("data")
+    check response["data"]["id"].getInt() == 42
+    check response["data"]["tag"].getStr() == "custom"
+    check response["detail"].getStr() == "resolved"
+
+  test "handleCompletionItemResolve with delay":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve = CompletionResolveConfig(
+      enabled: true,
+      items: @[CompletionResolveContent(label: "println", detail: some("resolved"))],
+    )
+    scenarioManager.scenarios["default"].delays.completionResolve = 100
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "println"}
+
+    let startTime = getTime()
+    let response = waitFor handler.handleCompletionItemResolve(%1, params)
+    let endTime = getTime()
+
+    let duration = (endTime - startTime).inMilliseconds
+    check duration >= 95
+    check response["detail"].getStr() == "resolved"
+
+  test "handleCompletionItemResolve with error injection":
+    let scenarioManager = createTestScenarioManager()
+    scenarioManager.scenarios["default"].completionResolve =
+      CompletionResolveConfig(enabled: true, items: @[])
+    scenarioManager.scenarios["default"].errors["completionResolve"] =
+      ErrorConfig(code: -32603, message: "Resolve failed")
+    discard scenarioManager.setScenario("default")
+    let handler = newLSPHandler(scenarioManager)
+
+    let params = %*{"label": "println"}
+
+    expect(LSPError):
+      discard waitFor handler.handleCompletionItemResolve(%1, params)
