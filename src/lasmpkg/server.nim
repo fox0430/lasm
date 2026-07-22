@@ -585,6 +585,86 @@ proc handleCodeActionResolve(
   except LSPError as e:
     await server.sendError(-32603, e.msg, id)
 
+proc handleDocumentDiagnosticImpl(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    let response = await server.lspHandler.handleDocumentDiagnostic(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
+
+proc handleDocumentDiagnostic(
+    server: LSPServer, id: JsonNode, params: JsonNode
+): Future[void] =
+  let requestFuture = newFuture[void]("handleDocumentDiagnostic")
+  server.addPendingRequest(id, requestFuture)
+
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleDocumentDiagnosticImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+
+  asyncSpawn asyncWrapper()
+  return requestFuture
+
+proc handleWorkspaceDiagnosticImpl(
+    server: LSPServer, id: JsonNode, params: JsonNode
+) {.async.} =
+  try:
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    let response = await server.lspHandler.handleWorkspaceDiagnostic(id, params)
+
+    if server.isRequestCancelled(id):
+      await server.sendError(-32800, "Request was cancelled", id)
+      return
+
+    await server.sendResponse(id, response)
+  except LSPError as e:
+    await server.sendError(-32603, e.msg, id)
+  except CancelledError:
+    await server.sendError(-32800, "Request was cancelled", id)
+  except Exception as e:
+    await server.sendError(-32603, "Internal error: " & e.msg, id)
+
+proc handleWorkspaceDiagnostic(
+    server: LSPServer, id: JsonNode, params: JsonNode
+): Future[void] =
+  let requestFuture = newFuture[void]("handleWorkspaceDiagnostic")
+  server.addPendingRequest(id, requestFuture)
+
+  proc asyncWrapper() {.async.} =
+    try:
+      await server.handleWorkspaceDiagnosticImpl(id, params)
+      requestFuture.complete()
+    except Exception as e:
+      requestFuture.fail(newException(CatchableError, e.msg))
+    finally:
+      server.removePendingRequest(id)
+
+  asyncSpawn asyncWrapper()
+  return requestFuture
+
 proc handleCancelRequest*(server: LSPServer, params: JsonNode) {.async.} =
   if params.hasKey("id"):
     let requestId = params["id"]
@@ -694,6 +774,10 @@ proc handleMessage*(server: LSPServer, message: JsonNode) {.async.} =
     await server.handleCodeAction(id, params)
   of "codeAction/resolve":
     await server.handleCodeActionResolve(id, params)
+  of "textDocument/diagnostic":
+    await server.handleDocumentDiagnostic(id, params)
+  of "workspace/diagnostic":
+    await server.handleWorkspaceDiagnostic(id, params)
   of "workspace/executeCommand":
     await server.handleExecuteCommand(id, params)
   of "workspace/didChangeConfiguration":

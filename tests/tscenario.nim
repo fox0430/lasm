@@ -746,6 +746,57 @@ suite "scenario module tests":
     check diag2.relatedInformation[0].message == "New function available here"
     check diag2.relatedInformation[0].location.uri == "file:///related.py"
 
+  test "loadConfigFile with relatedInformation missing range":
+    let tempDir = getTempDir()
+    configPath = tempDir / "test_relinfo_no_range_config.json"
+
+    let testConfig = %*{
+      "currentScenario": "relinfo_test",
+      "scenarios": {
+        "relinfo_test": {
+          "name": "RelatedInfo No Range",
+          "diagnostics": {
+            "enabled": true,
+            "diagnostics": [
+              {
+                "range": {
+                  "start": {"line": 0, "character": 0},
+                  "end": {"line": 0, "character": 5},
+                },
+                "severity": 1,
+                "message": "test diagnostic",
+                "relatedInformation": [
+                  {
+                    "location": {"uri": "file:///related.py"},
+                    "message": "related without range",
+                  }
+                ],
+              }
+            ],
+          },
+        }
+      },
+    }
+
+    writeFile(configPath, pretty(testConfig))
+
+    let sm = ScenarioManager()
+    sm.scenarios = initTable[string, Scenario]()
+
+    let result = sm.loadConfigFile(configPath)
+    check result == true
+
+    let scenario = sm.scenarios["relinfo_test"]
+    check scenario.diagnostics.diagnostics.len == 1
+    let diag = scenario.diagnostics.diagnostics[0]
+    check diag.relatedInformation.len == 1
+    check diag.relatedInformation[0].message == "related without range"
+    check diag.relatedInformation[0].location.uri == "file:///related.py"
+    check diag.relatedInformation[0].location.range.start.line == 0
+    check diag.relatedInformation[0].location.range.start.character == 0
+    check diag.relatedInformation[0].location.range.`end`.line == 0
+    check diag.relatedInformation[0].location.range.`end`.character == 0
+
   test "loadConfigFile with disabled diagnostics":
     let tempDir = getTempDir()
     configPath = tempDir / "test_disabled_diagnostic_config.json"

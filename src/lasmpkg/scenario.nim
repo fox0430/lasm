@@ -52,6 +52,23 @@ type
     enabled*: bool
     diagnostics*: seq[DiagnosticContent]
 
+  PullDiagnosticConfig* = object
+    enabled*: bool
+    resultId*: Option[string]
+    kind*: string # "full" or "unchanged"
+    diagnostics*: seq[DiagnosticContent]
+
+  WorkspacePullDiagnosticDocument* = object
+    uri*: string
+    version*: Option[int]
+    resultId*: Option[string]
+    kind*: string # "full" or "unchanged"
+    diagnostics*: seq[DiagnosticContent]
+
+  WorkspacePullDiagnosticConfig* = object
+    enabled*: bool
+    documents*: seq[WorkspacePullDiagnosticDocument]
+
   SemanticTokensConfig* = object
     enabled*: bool
     tokens*: seq[uinteger]
@@ -394,6 +411,8 @@ type
     completion*: int
     completionResolve*: int
     diagnostics*: int
+    pullDiagnostic*: int
+    workspaceDiagnostic*: int
     semanticTokens*: int
     semanticTokensDelta*: int
     inlayHint*: int
@@ -439,6 +458,8 @@ type
     completion*: CompletionConfig
     completionResolve*: CompletionResolveConfig
     diagnostics*: DiagnosticConfig
+    pullDiagnostic*: PullDiagnosticConfig
+    workspaceDiagnostic*: WorkspacePullDiagnosticConfig
     semanticTokens*: SemanticTokensConfig
     semanticTokensDelta*: SemanticTokensDeltaConfig
     inlayHint*: InlayHintConfig
@@ -490,6 +511,53 @@ proc parseRange(rangeNode: JsonNode): Range =
       character: uinteger(rangeNode["end"]["character"].getInt(0)),
     ),
   )
+
+proc parseDiagnosticContent(diagNode: JsonNode): DiagnosticContent =
+  ## Parses a single diagnostic entry shared by push (`diagnostics`) and
+  ## pull (`pullDiagnostic` / `workspaceDiagnostic`) configuration.
+  result = DiagnosticContent(
+    message: diagNode["message"].getStr(""),
+    severity: diagNode{"severity"}.getInt(1), # Default to Error
+  )
+
+  if diagNode.contains("range"):
+    result.range = parseRange(diagNode["range"])
+  else:
+    # Default to first character
+    result.range = Range(
+      start: Position(line: 0, character: 0), `end`: Position(line: 0, character: 1)
+    )
+
+  if diagNode.contains("code"):
+    result.code = some(diagNode["code"].getStr())
+  if diagNode.contains("source"):
+    result.source = some(diagNode["source"].getStr())
+  if diagNode.contains("tags"):
+    result.tags = @[]
+    for tagNode in diagNode["tags"]:
+      result.tags.add(tagNode.getInt())
+  else:
+    result.tags = @[]
+
+  if diagNode.contains("relatedInformation"):
+    result.relatedInformation = @[]
+    for relInfoNode in diagNode["relatedInformation"]:
+      var relInfo =
+        DiagnosticRelatedInformation(message: relInfoNode["message"].getStr(""))
+      if relInfoNode.contains("location"):
+        let locNode = relInfoNode["location"]
+        let range =
+          if locNode.contains("range"):
+            parseRange(locNode["range"])
+          else:
+            Range(
+              start: Position(line: 0, character: 0),
+              `end`: Position(line: 0, character: 0),
+            )
+        relInfo.location = Location(uri: locNode["uri"].getStr(""), range: range)
+      result.relatedInformation.add(relInfo)
+  else:
+    result.relatedInformation = @[]
 
 proc parseCallHierarchyItem(itemNode: JsonNode): CallHierarchyItemContent =
   ## Parses a CallHierarchyItem from a JSON node.
@@ -908,61 +976,54 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
           if d.enabled and diagnosticsNode.contains("diagnostics"):
             d.diagnostics = @[]
             for diagNode in diagnosticsNode["diagnostics"]:
-              var diag = DiagnosticContent(
-                message: diagNode["message"].getStr(""),
-                severity: diagNode{"severity"}.getInt(1), # Default to Error
-              )
-
-              if diagNode.contains("range"):
-                diag.range = parseRange(diagNode["range"])
-              else:
-                # Default to first character
-                diag.range = Range(
-                  start: Position(line: 0, character: 0),
-                  `end`: Position(line: 0, character: 1),
-                )
-
-              if diagNode.contains("code"):
-                diag.code = some(diagNode["code"].getStr())
-              if diagNode.contains("source"):
-                diag.source = some(diagNode["source"].getStr())
-              if diagNode.contains("tags"):
-                diag.tags = @[]
-                for tagNode in diagNode["tags"]:
-                  diag.tags.add(tagNode.getInt())
-              else:
-                diag.tags = @[]
-
-              if diagNode.contains("relatedInformation"):
-                diag.relatedInformation = @[]
-                for relInfoNode in diagNode["relatedInformation"]:
-                  var relInfo = DiagnosticRelatedInformation(
-                    message: relInfoNode["message"].getStr("")
-                  )
-                  if relInfoNode.contains("location"):
-                    let locNode = relInfoNode["location"]
-                    relInfo.location = Location(
-                      uri: locNode["uri"].getStr(""),
-                      range: Range(
-                        start: Position(
-                          line: locNode["range"]["start"]["line"].getInt(0),
-                          character: locNode["range"]["start"]["character"].getInt(0),
-                        ),
-                        `end`: Position(
-                          line: locNode["range"]["end"]["line"].getInt(0),
-                          character: locNode["range"]["end"]["character"].getInt(0),
-                        ),
-                      ),
-                    )
-                  diag.relatedInformation.add(relInfo)
-              else:
-                diag.relatedInformation = @[]
-
-              d.diagnostics.add(diag)
+              d.diagnostics.add(parseDiagnosticContent(diagNode))
           scenario.diagnostics = d
         else:
           # Default diagnostics config if not specified
           scenario.diagnostics = DiagnosticConfig(enabled: false, diagnostics: @[])
+
+        if scenarioData.hasKey("pullDiagnostic"):
+          # Load textDocument/diagnostic (pull) configuration
+          let pullNode = scenarioData["pullDiagnostic"]
+          var pd = PullDiagnosticConfig(
+            enabled: pullNode{"enabled"}.getBool(false),
+            kind: pullNode{"kind"}.getStr("full"),
+          )
+          if pullNode.contains("resultId"):
+            pd.resultId = some(pullNode["resultId"].getStr())
+          if pd.enabled and pullNode.contains("diagnostics"):
+            pd.diagnostics = @[]
+            for diagNode in pullNode["diagnostics"]:
+              pd.diagnostics.add(parseDiagnosticContent(diagNode))
+          scenario.pullDiagnostic = pd
+        else:
+          scenario.pullDiagnostic =
+            PullDiagnosticConfig(enabled: false, kind: "full", diagnostics: @[])
+
+        if scenarioData.hasKey("workspaceDiagnostic"):
+          # Load workspace/diagnostic (pull) configuration
+          let wsNode = scenarioData["workspaceDiagnostic"]
+          var wd =
+            WorkspacePullDiagnosticConfig(enabled: wsNode{"enabled"}.getBool(false))
+          if wd.enabled and wsNode.contains("documents"):
+            wd.documents = @[]
+            for docNode in wsNode["documents"]:
+              var doc = WorkspacePullDiagnosticDocument(
+                uri: docNode{"uri"}.getStr(""), kind: docNode{"kind"}.getStr("full")
+              )
+              if docNode.contains("version") and docNode["version"].kind != JNull:
+                doc.version = some(docNode["version"].getInt())
+              if docNode.contains("resultId"):
+                doc.resultId = some(docNode["resultId"].getStr())
+              if docNode.contains("diagnostics"):
+                doc.diagnostics = @[]
+                for diagNode in docNode["diagnostics"]:
+                  doc.diagnostics.add(parseDiagnosticContent(diagNode))
+              wd.documents.add(doc)
+          scenario.workspaceDiagnostic = wd
+        else:
+          scenario.workspaceDiagnostic =
+            WorkspacePullDiagnosticConfig(enabled: false, documents: @[])
 
         if scenarioData.hasKey("semanticTokens"):
           # Load semantic tokens configuration
@@ -1797,6 +1858,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             completion: delaysNode{"completion"}.getInt(0),
             completionResolve: delaysNode{"completionResolve"}.getInt(0),
             diagnostics: delaysNode{"diagnostics"}.getInt(0),
+            pullDiagnostic: delaysNode{"pullDiagnostic"}.getInt(0),
+            workspaceDiagnostic: delaysNode{"workspaceDiagnostic"}.getInt(0),
             semanticTokens: delaysNode{"semanticTokens"}.getInt(0),
             semanticTokensDelta: delaysNode{"semanticTokensDelta"}.getInt(0),
             inlayHint: delaysNode{"inlayHint"}.getInt(0),
@@ -1835,6 +1898,8 @@ proc loadConfigFile*(sm: ScenarioManager, configPath: string = ""): bool =
             completion: 0,
             completionResolve: 0,
             diagnostics: 0,
+            pullDiagnostic: 0,
+            workspaceDiagnostic: 0,
             semanticTokens: 0,
             semanticTokensDelta: 0,
             inlayHint: 0,
@@ -1899,6 +1964,8 @@ proc createEmptyScenario*(name: string = "default"): Scenario =
     completion: CompletionConfig(enabled: false),
     completionResolve: CompletionResolveConfig(enabled: false),
     diagnostics: DiagnosticConfig(enabled: false),
+    pullDiagnostic: PullDiagnosticConfig(enabled: false, kind: "full"),
+    workspaceDiagnostic: WorkspacePullDiagnosticConfig(enabled: false),
     semanticTokens: SemanticTokensConfig(enabled: false),
     semanticTokensDelta: SemanticTokensDeltaConfig(enabled: false),
     inlayHint: InlayHintConfig(enabled: false),
@@ -2048,6 +2115,46 @@ proc createSampleConfig*(sm: ScenarioManager) =
             },
           ],
         },
+        "pullDiagnostic": {
+          "enabled": true,
+          "kind": "full",
+          "resultId": "pull-1",
+          "diagnostics": [
+            {
+              "range": {
+                "start": {"line": 2, "character": 10},
+                "end": {"line": 2, "character": 20},
+              },
+              "severity": 1,
+              "code": "E001",
+              "source": "lasm",
+              "message": "Undefined variable 'testVar' (pull)",
+            }
+          ],
+        },
+        "workspaceDiagnostic": {
+          "enabled": true,
+          "documents": [
+            {
+              "uri": "file:///workspace/main.nim",
+              "version": 1,
+              "kind": "full",
+              "resultId": "ws-1",
+              "diagnostics": [
+                {
+                  "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 0, "character": 4},
+                  },
+                  "severity": 2,
+                  "code": "W100",
+                  "source": "lasm",
+                  "message": "Workspace diagnostic for main.nim",
+                }
+              ],
+            }
+          ],
+        },
         "inlayHint": {
           "enabled": true,
           "hints": [
@@ -2092,6 +2199,8 @@ proc createSampleConfig*(sm: ScenarioManager) =
           "completion": 100,
           "completionResolve": 30,
           "diagnostics": 200,
+          "pullDiagnostic": 30,
+          "workspaceDiagnostic": 30,
           "hover": 50,
           "semanticTokens": 30,
           "semanticTokensDelta": 30,

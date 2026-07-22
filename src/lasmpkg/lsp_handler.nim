@@ -175,8 +175,10 @@ proc handleInitialize*(
   result = newJObject()
   var capabilitiesJson = %serverCapabilities
   # Add diagnosticProvider manually since it's not in the type definition
-  capabilitiesJson["diagnosticProvider"] =
-    %*{"interFileDependencies": false, "workspaceDiagnostics": false}
+  capabilitiesJson["diagnosticProvider"] = %*{
+    "interFileDependencies": false,
+    "workspaceDiagnostics": currentScenario.workspaceDiagnostic.enabled,
+  }
   result["capabilities"] = capabilitiesJson
   result["serverInfo"] = %*{"name": "LSP Test Server", "version": "0.1.0"}
 
@@ -331,6 +333,24 @@ proc handleExecuteCommand*(
   else:
     raise newException(LSPError, "Unknown command: " & command)
 
+proc toDiagnostic(content: DiagnosticContent): Diagnostic =
+  result = Diagnostic()
+  result.range = content.range
+  result.severity = some(content.severity)
+  result.message = content.message
+
+  if content.code.isSome:
+    result.code = some(%content.code.get)
+
+  if content.source.isSome:
+    result.source = content.source
+
+  if content.tags.len > 0:
+    result.tags = some(content.tags)
+
+  if content.relatedInformation.len > 0:
+    result.relatedInformation = some(content.relatedInformation)
+
 proc publishDiagnostics*(
     handler: LSPHandler, uri: string
 ): Future[seq[JsonNode]] {.async.} =
@@ -368,21 +388,7 @@ proc publishDiagnostics*(
   var diagnostics: seq[Diagnostic] = @[]
 
   for diagContent in scenario.diagnostics.diagnostics:
-    let diagnostic = Diagnostic()
-    diagnostic.range = diagContent.range
-    diagnostic.severity = some(diagContent.severity)
-    diagnostic.message = diagContent.message
-
-    if diagContent.code.isSome:
-      diagnostic.code = some(%diagContent.code.get)
-
-    if diagContent.source.isSome:
-      diagnostic.source = diagContent.source
-
-    if diagContent.relatedInformation.len > 0:
-      diagnostic.relatedInformation = some(diagContent.relatedInformation)
-
-    diagnostics.add(diagnostic)
+    diagnostics.add(toDiagnostic(diagContent))
 
   publishParams.diagnostics = some(diagnostics)
 
@@ -404,6 +410,82 @@ proc publishDiagnostics*(
   notifications.add(logNotification)
 
   return notifications
+
+proc handleDocumentDiagnostic*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  if scenario.delays.pullDiagnostic > 0:
+    await sleepAsync(scenario.delays.pullDiagnostic.milliseconds)
+
+  if not scenario.pullDiagnostic.enabled:
+    return %*{"kind": "full", "items": []}
+
+  if "pullDiagnostic" in scenario.errors:
+    let error = scenario.errors["pullDiagnostic"]
+    raise newException(LSPError, error.message)
+
+  let kind = scenario.pullDiagnostic.kind
+  if kind == "unchanged" and scenario.pullDiagnostic.resultId.isNone:
+    raise newException(LSPError, "unchanged diagnostic report requires resultId")
+
+  result = newJObject()
+  result["kind"] = %kind
+  if scenario.pullDiagnostic.resultId.isSome:
+    result["resultId"] = %scenario.pullDiagnostic.resultId.get
+
+  if kind == "unchanged":
+    return
+
+  var items: seq[JsonNode] = @[]
+  for content in scenario.pullDiagnostic.diagnostics:
+    items.add(%toDiagnostic(content))
+  result["items"] = %items
+
+proc handleWorkspaceDiagnostic*(
+    handler: LSPHandler, id: JsonNode, params: JsonNode
+): Future[JsonNode] {.async.} =
+  let scenario = handler.scenarioManager.getCurrentScenario()
+
+  if scenario.delays.workspaceDiagnostic > 0:
+    await sleepAsync(scenario.delays.workspaceDiagnostic.milliseconds)
+
+  if not scenario.workspaceDiagnostic.enabled:
+    return %*{"items": []}
+
+  if "workspaceDiagnostic" in scenario.errors:
+    let error = scenario.errors["workspaceDiagnostic"]
+    raise newException(LSPError, error.message)
+
+  result = newJObject()
+  var items: seq[JsonNode] = @[]
+
+  for doc in scenario.workspaceDiagnostic.documents:
+    if doc.kind == "unchanged" and doc.resultId.isNone:
+      raise newException(
+        LSPError, "unchanged workspace diagnostic report requires resultId: " & doc.uri
+      )
+
+    var report = newJObject()
+    report["kind"] = %doc.kind
+    report["uri"] = %doc.uri
+    if doc.resultId.isSome:
+      report["resultId"] = %doc.resultId.get
+    if doc.version.isSome:
+      report["version"] = %doc.version.get
+    else:
+      report["version"] = newJNull()
+
+    if doc.kind != "unchanged":
+      var diagnostics: seq[JsonNode] = @[]
+      for content in doc.diagnostics:
+        diagnostics.add(%toDiagnostic(content))
+      report["items"] = %diagnostics
+
+    items.add(report)
+
+  result["items"] = %items
 
 proc handleDidOpen*(
     handler: LSPHandler, params: JsonNode
