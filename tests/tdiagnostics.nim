@@ -469,6 +469,13 @@ suite "diagnostic functionality tests":
     # Optional fields should not be present or be null
     check not diag.hasKey("code") or diag["code"].kind == JNull
     check not diag.hasKey("source") or diag["source"].kind == JNull
+    # LSP spec: tags / relatedInformation must be arrays when present.
+    # std/json serializes `none(seq[T])` as `null`, which crashes
+    # spec-strict clients — emit `[]` instead.
+    check diag.hasKey("tags") and diag["tags"].kind == JArray
+    check diag["tags"].len == 0
+    check diag.hasKey("relatedInformation") and diag["relatedInformation"].kind == JArray
+    check diag["relatedInformation"].len == 0
 
   test "handleDocumentDiagnostic returns full report when enabled":
     let sm = createTestScenarioManager()
