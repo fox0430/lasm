@@ -30,6 +30,7 @@ type
     code*: OptionalNode # int or string
     source*: Option[string]
     message*: string
+    tags*: OptionalSeq[int]
     relatedInformation*: OptionalSeq[DiagnosticRelatedInformation]
 
   DiagnosticRelatedInformation* = ref object of RootObj

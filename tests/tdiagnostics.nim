@@ -469,3 +469,179 @@ suite "diagnostic functionality tests":
     # Optional fields should not be present or be null
     check not diag.hasKey("code") or diag["code"].kind == JNull
     check not diag.hasKey("source") or diag["source"].kind == JNull
+
+  test "handleDocumentDiagnostic returns full report when enabled":
+    let sm = createTestScenarioManager()
+    sm.scenarios["pull_diag"] = Scenario(
+      name: "Pull Diagnostic Test",
+      pullDiagnostic: PullDiagnosticConfig(
+        enabled: true,
+        kind: "full",
+        resultId: some("pull-1"),
+        diagnostics: @[
+          DiagnosticContent(
+            range: Range(
+              start: Position(line: 2, character: 10),
+              `end`: Position(line: 2, character: 20),
+            ),
+            severity: 1,
+            code: some("E001"),
+            source: some("lasm"),
+            message: "Undefined variable 'testVar'",
+            tags: @[],
+            relatedInformation: @[],
+          )
+        ],
+      ),
+      delays: DelayConfig(),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "pull_diag"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+    let response = waitFor handler.handleDocumentDiagnostic(%1, params)
+
+    check response["kind"].getStr() == "full"
+    check response["resultId"].getStr() == "pull-1"
+    check response["items"].len == 1
+
+    let diag = response["items"][0]
+    check diag["message"].getStr() == "Undefined variable 'testVar'"
+    check diag["severity"].getInt() == 1
+    check diag["code"].getStr() == "E001"
+    check diag["range"]["start"]["line"].getInt() == 2
+
+  test "handleDocumentDiagnostic returns empty full report when disabled":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "default"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+    let response = waitFor handler.handleDocumentDiagnostic(%1, params)
+
+    check response["kind"].getStr() == "full"
+    check response["items"].len == 0
+
+  test "handleDocumentDiagnostic returns unchanged report":
+    let sm = createTestScenarioManager()
+    sm.scenarios["pull_unchanged"] = Scenario(
+      name: "Pull Unchanged Test",
+      pullDiagnostic: PullDiagnosticConfig(
+        enabled: true, kind: "unchanged", resultId: some("pull-1"), diagnostics: @[]
+      ),
+      delays: DelayConfig(),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "pull_unchanged"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+    let response = waitFor handler.handleDocumentDiagnostic(%1, params)
+
+    check response["kind"].getStr() == "unchanged"
+    check response["resultId"].getStr() == "pull-1"
+    check not response.hasKey("items")
+
+  test "handleDocumentDiagnostic with error injection":
+    let sm = createTestScenarioManager()
+    sm.scenarios["pull_error"] = Scenario(
+      name: "Pull Error Test",
+      pullDiagnostic: PullDiagnosticConfig(enabled: true, kind: "full"),
+      delays: DelayConfig(),
+      errors:
+        {"pullDiagnostic": ErrorConfig(code: -32603, message: "Pull error")}.toTable,
+    )
+    sm.currentScenario = "pull_error"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"textDocument": {"uri": "file:///test.nim"}}
+    expect LSPError:
+      discard waitFor handler.handleDocumentDiagnostic(%1, params)
+
+  test "handleWorkspaceDiagnostic returns per-document reports":
+    let sm = createTestScenarioManager()
+    sm.scenarios["ws_diag"] = Scenario(
+      name: "Workspace Diagnostic Test",
+      workspaceDiagnostic: WorkspacePullDiagnosticConfig(
+        enabled: true,
+        documents: @[
+          WorkspacePullDiagnosticDocument(
+            uri: "file:///workspace/main.nim",
+            version: some(1),
+            resultId: some("ws-1"),
+            kind: "full",
+            diagnostics: @[
+              DiagnosticContent(
+                range: Range(
+                  start: Position(line: 0, character: 0),
+                  `end`: Position(line: 0, character: 4),
+                ),
+                severity: 2,
+                code: some("W100"),
+                source: some("lasm"),
+                message: "Workspace diagnostic for main.nim",
+                tags: @[],
+                relatedInformation: @[],
+              )
+            ],
+          ),
+          WorkspacePullDiagnosticDocument(
+            uri: "file:///workspace/unchanged.nim",
+            resultId: some("ws-2"),
+            kind: "unchanged",
+            diagnostics: @[],
+          ),
+        ],
+      ),
+      delays: DelayConfig(),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "ws_diag"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"previousResultIds": []}
+    let response = waitFor handler.handleWorkspaceDiagnostic(%1, params)
+
+    check response["items"].len == 2
+
+    let full = response["items"][0]
+    check full["kind"].getStr() == "full"
+    check full["uri"].getStr() == "file:///workspace/main.nim"
+    check full["resultId"].getStr() == "ws-1"
+    check full["version"].getInt() == 1
+    check full["items"].len == 1
+    check full["items"][0]["message"].getStr() == "Workspace diagnostic for main.nim"
+
+    let unchanged = response["items"][1]
+    check unchanged["kind"].getStr() == "unchanged"
+    check unchanged["uri"].getStr() == "file:///workspace/unchanged.nim"
+    check unchanged["resultId"].getStr() == "ws-2"
+    check not unchanged.hasKey("items")
+
+  test "handleWorkspaceDiagnostic returns empty items when disabled":
+    let sm = createTestScenarioManager()
+    sm.currentScenario = "default"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"previousResultIds": []}
+    let response = waitFor handler.handleWorkspaceDiagnostic(%1, params)
+
+    check response["items"].len == 0
+
+  test "handleInitialize advertises workspaceDiagnostics from scenario":
+    let sm = createTestScenarioManager()
+    sm.scenarios["ws_cap"] = Scenario(
+      name: "Workspace Capability Test",
+      workspaceDiagnostic: WorkspacePullDiagnosticConfig(enabled: true),
+      delays: DelayConfig(),
+      errors: initTable[string, ErrorConfig](),
+    )
+    sm.currentScenario = "ws_cap"
+    let handler = newLSPHandler(sm)
+
+    let params = %*{"processId": 1234, "capabilities": {}}
+    let response = waitFor handler.handleInitialize(%1, params)
+
+    let provider = response["capabilities"]["diagnosticProvider"]
+    check provider["workspaceDiagnostics"].getBool() == true
