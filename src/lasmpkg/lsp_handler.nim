@@ -345,11 +345,10 @@ proc toDiagnostic(content: DiagnosticContent): Diagnostic =
   if content.source.isSome:
     result.source = content.source
 
-  if content.tags.len > 0:
-    result.tags = some(content.tags)
-
-  if content.relatedInformation.len > 0:
-    result.relatedInformation = some(content.relatedInformation)
+  # std/json serializes `none(seq[T])` as `null`, which violates the LSP
+  # spec: these fields must be an array when present. Always wrap in `some`.
+  result.tags = some(content.tags)
+  result.relatedInformation = some(content.relatedInformation)
 
 proc publishDiagnostics*(
     handler: LSPHandler, uri: string
